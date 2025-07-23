@@ -12,8 +12,11 @@ class _SocketServerPageState extends State<SocketServerPage> {
   final SocketService _socketService = SocketService();
   bool _isServerRunning = false;
   String _statusMessage = "服务未启动";
-  List<String> _connectedClients = [];
+  List<ClientConnection> _connectedClients = []; // 更新为ClientConnection类型
   List<MessageLog> _messageLogs = []; // 消息日志列表
+  final TextEditingController _testMessageController = TextEditingController(
+    text: "测试消息",
+  );
 
   @override
   void initState() {
@@ -50,6 +53,7 @@ class _SocketServerPageState extends State<SocketServerPage> {
 
   @override
   void dispose() {
+    _testMessageController.dispose(); // 释放控制器
     _socketService.dispose();
     super.dispose();
   }
@@ -69,10 +73,10 @@ class _SocketServerPageState extends State<SocketServerPage> {
             _buildServerStatusCard(),
             const SizedBox(height: 16),
             Expanded(
-              child: Row(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 左侧显示客户端列表
+                  // 顶部显示客户端列表
                   Expanded(
                     flex: 1,
                     child: Column(
@@ -87,8 +91,8 @@ class _SocketServerPageState extends State<SocketServerPage> {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 16),
-                  // 右侧显示消息日志
+                  const SizedBox(height: 16),
+                  // 底部显示消息日志
                   Expanded(
                     flex: 2,
                     child: Column(
@@ -157,13 +161,60 @@ class _SocketServerPageState extends State<SocketServerPage> {
         : ListView.builder(
             itemCount: _connectedClients.length,
             itemBuilder: (context, index) {
-              return ListTile(
-                leading: const Icon(Icons.devices),
-                title: Text(_connectedClients[index]),
-                dense: true,
+              final client = _connectedClients[index];
+              return Card(
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                child: ListTile(
+                  leading: Icon(
+                    client.clientType == "Socket"
+                        ? Icons.settings_ethernet
+                        : Icons.language,
+                    color: Theme.of(context).primaryColor,
+                  ),
+                  title: Text(client.displayName),
+                  subtitle: Text('连接时间: ${client.formattedConnectTime}'),
+                  trailing: ElevatedButton(
+                    onPressed: () => _showSendMessageDialog(client),
+                    child: const Text('发送测试消息'),
+                  ),
+                  dense: true,
+                ),
               );
             },
           );
+  }
+
+  // 显示发送消息对话框
+  void _showSendMessageDialog(ClientConnection client) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('发送测试消息给 ${client.displayName}'),
+        content: TextField(
+          controller: _testMessageController,
+          decoration: const InputDecoration(
+            labelText: '消息内容',
+            hintText: '输入要发送的消息',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              _socketService.sendTestMessage(
+                client.connection,
+                _testMessageController.text,
+              );
+              Navigator.pop(context);
+            },
+            child: const Text('发送'),
+          ),
+        ],
+      ),
+    );
   }
 
   // 消息日志列表

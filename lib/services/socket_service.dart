@@ -27,10 +27,31 @@ class MessageLog {
   }
 }
 
+// 客户端连接类
+class ClientConnection {
+  final String clientAddress;
+  final String clientType; // "Socket" 或 "WebSocket"
+  final DateTime connectTime;
+  final dynamic connection; // Socket 或 WebSocket 对象
+
+  ClientConnection({
+    required this.clientAddress,
+    required this.clientType,
+    required this.connectTime,
+    required this.connection,
+  });
+
+  String get displayName => "$clientType客户端: $clientAddress";
+
+  String get formattedConnectTime {
+    return '${connectTime.month}-${connectTime.day} ${connectTime.hour}:${connectTime.minute.toString().padLeft(2, '0')}:${connectTime.second.toString().padLeft(2, '0')}';
+  }
+}
+
 class SocketService {
   bool isServerRunning = false;
   String statusMessage = "服务未启动";
-  List<String> connectedClients = [];
+  List<ClientConnection> clientConnections = [];
   ServerSocket? server;
   HttpServer? httpServer;
   List<Socket> sockets = [];
@@ -51,8 +72,9 @@ class SocketService {
   Stream<String> get statusStream => _statusController.stream;
 
   // 客户端列表变化通知
-  final _clientsController = StreamController<List<String>>.broadcast();
-  Stream<List<String>> get clientsStream => _clientsController.stream;
+  final _clientsController =
+      StreamController<List<ClientConnection>>.broadcast();
+  Stream<List<ClientConnection>> get clientsStream => _clientsController.stream;
 
   // 服务器状态变化通知
   final _runningController = StreamController<bool>.broadcast();
@@ -87,7 +109,7 @@ class SocketService {
           // 再重新启动服务
           await startServer();
           statusMessage =
-              "服务已启动：\nSocket：$serverIp:$serverPort\nWebSocket：$serverIp:$webSocketPort";
+              "服务已启动：\nNativeSocket：$serverIp:$serverPort\nWebSocket：$serverIp:$webSocketPort";
           _notifyStatusChange();
         } else {
           // 如果服务未运行，尝试启动服务
@@ -210,7 +232,7 @@ class SocketService {
 
     isServerRunning = false;
     statusMessage = "服务已停止";
-    connectedClients.clear();
+    clientConnections.clear();
     sockets.clear();
     webSockets.clear();
     _messageLogs.clear(); // 清空消息日志
@@ -224,9 +246,15 @@ class SocketService {
     final clientAddress =
         "${socket.remoteAddress.address}:${socket.remotePort}";
 
-    connectedClients.add("Socket客户端: $clientAddress");
-    // 不更新状态信息，保持显示IP和端口
-    _notifyStatusChange();
+    clientConnections.add(
+      ClientConnection(
+        clientAddress: clientAddress,
+        clientType: "Socket",
+        connectTime: DateTime.now(),
+        connection: socket,
+      ),
+    );
+    _notifyClientsChange();
 
     // 监听客户端消息
     socket.listen(
@@ -258,23 +286,29 @@ class SocketService {
   // 处理WebSocket新连接
   void _handleWebSocketConnection(WebSocket webSocket, String? remoteAddress) {
     webSockets.add(webSocket);
-    // 使用实际IP地址替代计数
-    final clientAddress = "WebSocket客户端: ${remoteAddress ?? '未知IP'}";
+    // 构建WebSocket客户端地址
+    final clientAddress = remoteAddress ?? '未知IP';
 
-    connectedClients.add(clientAddress);
-    // 不更新状态信息，保持显示IP和端口
-    _notifyStatusChange();
+    clientConnections.add(
+      ClientConnection(
+        clientAddress: clientAddress,
+        clientType: "WebSocket",
+        connectTime: DateTime.now(),
+        connection: webSocket,
+      ),
+    );
+    _notifyClientsChange();
 
     // 监听WebSocket消息
     webSocket.listen(
       (dynamic data) {
         // WebSocket数据可能是String或Uint8List
         final message = data is String ? data : String.fromCharCodes(data);
-        print("收到来自$clientAddress的消息: $message");
+        print("收到来自WebSocket客户端 $clientAddress 的消息: $message");
 
         // 添加消息日志
         _addMessageLog(
-          clientAddress: clientAddress,
+          clientAddress: "WebSocket客户端: $clientAddress",
           message: message,
           isIncoming: true,
         );
@@ -297,8 +331,8 @@ class SocketService {
     socket.destroy();
     sockets.remove(socket);
 
-    connectedClients.remove("Socket客户端: $clientAddress");
-    _updateStatusAfterClientRemoved();
+    clientConnections.removeWhere((conn) => conn.connection == socket);
+    _notifyClientsChange();
   }
 
   // 移除断开连接的WebSocket客户端
@@ -306,14 +340,15 @@ class SocketService {
     webSocket.close();
     webSockets.remove(webSocket);
 
-    connectedClients.remove(clientAddress);
-    _updateStatusAfterClientRemoved();
+    // 使用WebSocket对象引用来移除客户端连接
+    clientConnections.removeWhere((conn) => conn.connection == webSocket);
+    _notifyClientsChange();
   }
 
   // 更新客户端移除后的状态
   void _updateStatusAfterClientRemoved() {
     // 不更新状态信息，保持显示IP和端口
-    _notifyStatusChange();
+    _notifyClientsChange();
   }
 
   // 获取本地IP地址
@@ -362,7 +397,51 @@ class SocketService {
   // 通知状态变化
   void _notifyStatusChange() {
     _statusController.add(statusMessage);
-    _clientsController.add(List.from(connectedClients));
+    _clientsController.add(List.from(clientConnections));
     _runningController.add(isServerRunning);
+  }
+
+  // 通知客户端列表变化
+  void _notifyClientsChange() {
+    _clientsController.add(List.from(clientConnections));
+  }
+
+  // 发送测试消息到特定客户端
+  void sendTestMessage(dynamic connection, String message) {
+    try {
+      if (connection is Socket) {
+        // 发送到Socket客户端
+        final socket = connection as Socket;
+        final clientAddress =
+            "${socket.remoteAddress.address}:${socket.remotePort}";
+        socket.add(message.codeUnits);
+
+        // 添加消息日志
+        _addMessageLog(
+          clientAddress: "Socket客户端: $clientAddress",
+          message: message,
+          isIncoming: false,
+        );
+      } else if (connection is WebSocket) {
+        // 发送到WebSocket客户端
+        final webSocket = connection as WebSocket;
+        final clientIndex = clientConnections.indexWhere(
+          (conn) => conn.connection == webSocket,
+        );
+        if (clientIndex >= 0) {
+          final clientAddress = clientConnections[clientIndex].clientAddress;
+          webSocket.add(message);
+
+          // 添加消息日志
+          _addMessageLog(
+            clientAddress: clientAddress,
+            message: message,
+            isIncoming: false,
+          );
+        }
+      }
+    } catch (e) {
+      print("发送测试消息失败: $e");
+    }
   }
 }
