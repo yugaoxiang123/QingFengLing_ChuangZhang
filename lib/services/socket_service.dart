@@ -5,6 +5,30 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:web_socket_channel/io.dart';
 
+// 消息日志类
+class MessageLog {
+  final String clientAddress;
+  final String message;
+  final DateTime timestamp;
+  final bool isIncoming; // 是否为接收的消息
+
+  MessageLog({
+    required this.clientAddress,
+    required this.message,
+    required this.timestamp,
+    required this.isIncoming,
+  });
+
+  String get formattedTime =>
+      '${timestamp.hour}:${timestamp.minute.toString().padLeft(2, '0')}:${timestamp.second.toString().padLeft(2, '0')}';
+
+  @override
+  String toString() {
+    final direction = isIncoming ? '收到' : '发送';
+    return '[$formattedTime] $direction ($clientAddress): $message';
+  }
+}
+
 class SocketService {
   bool isServerRunning = false;
   String statusMessage = "服务未启动";
@@ -16,6 +40,13 @@ class SocketService {
   String serverIp = "0.0.0.0";
   int serverPort = 8888;
   int webSocketPort = 8889; // WebSocket使用不同的端口
+
+  // 消息日志
+  final List<MessageLog> _messageLogs = [];
+
+  // 消息日志通知
+  final _messageLogController = StreamController<List<MessageLog>>.broadcast();
+  Stream<List<MessageLog>> get messageLogStream => _messageLogController.stream;
 
   // 状态变化通知
   final _statusController = StreamController<String>.broadcast();
@@ -57,7 +88,8 @@ class SocketService {
           await Future.delayed(Duration(milliseconds: 500));
           // 再重新启动服务
           await startServer();
-          statusMessage = "服务已重新启动：$serverIp:$serverPort";
+          statusMessage =
+              "服务已启动：\nSocket：$serverIp:$serverPort\nWebSocket：$serverIp:$webSocketPort";
           _notifyStatusChange();
         } else {
           // 如果服务未运行，尝试启动服务
@@ -73,6 +105,7 @@ class SocketService {
     _statusController.close();
     _clientsController.close();
     _runningController.close();
+    _messageLogController.close();
   }
 
   // 启动Socket服务器和WebSocket服务器
@@ -121,7 +154,10 @@ class SocketService {
             try {
               // 将HTTP请求升级为WebSocket连接
               final webSocket = await WebSocketTransformer.upgrade(request);
-              _handleWebSocketConnection(webSocket);
+              _handleWebSocketConnection(
+                webSocket,
+                request.connectionInfo?.remoteAddress.address,
+              );
             } catch (e) {
               print("WebSocket握手失败: $e");
               request.response.statusCode = HttpStatus.internalServerError;
@@ -179,7 +215,9 @@ class SocketService {
     connectedClients.clear();
     sockets.clear();
     webSockets.clear();
+    _messageLogs.clear(); // 清空消息日志
     _notifyStatusChange();
+    _notifyMessageLogChange();
   }
 
   // 处理Socket新连接
@@ -189,7 +227,7 @@ class SocketService {
         "${socket.remoteAddress.address}:${socket.remotePort}";
 
     connectedClients.add("Socket客户端: $clientAddress");
-    statusMessage = "已连接客户端：${connectedClients.length}个";
+    // 不更新状态信息，保持显示IP和端口
     _notifyStatusChange();
 
     // 监听客户端消息
@@ -198,6 +236,14 @@ class SocketService {
         // 处理接收到的数据
         final message = String.fromCharCodes(data);
         print("收到来自Socket客户端 $clientAddress 的消息: $message");
+
+        // 添加消息日志
+        _addMessageLog(
+          clientAddress: clientAddress,
+          message: message,
+          isIncoming: true,
+        );
+
         // 这里可以添加处理接收数据的逻辑
       },
       onError: (error) {
@@ -212,12 +258,13 @@ class SocketService {
   }
 
   // 处理WebSocket新连接
-  void _handleWebSocketConnection(WebSocket webSocket) {
+  void _handleWebSocketConnection(WebSocket webSocket, String? remoteAddress) {
     webSockets.add(webSocket);
-    final clientAddress = "WebSocket客户端: ${webSockets.length}";
+    // 使用实际IP地址替代计数
+    final clientAddress = "WebSocket客户端: ${remoteAddress ?? '未知IP'}";
 
     connectedClients.add(clientAddress);
-    statusMessage = "已连接客户端：${connectedClients.length}个";
+    // 不更新状态信息，保持显示IP和端口
     _notifyStatusChange();
 
     // 监听WebSocket消息
@@ -226,6 +273,14 @@ class SocketService {
         // WebSocket数据可能是String或Uint8List
         final message = data is String ? data : String.fromCharCodes(data);
         print("收到来自$clientAddress的消息: $message");
+
+        // 添加消息日志
+        _addMessageLog(
+          clientAddress: clientAddress,
+          message: message,
+          isIncoming: true,
+        );
+
         // 这里可以添加处理WebSocket消息的逻辑
       },
       onError: (error) {
@@ -259,11 +314,7 @@ class SocketService {
 
   // 更新客户端移除后的状态
   void _updateStatusAfterClientRemoved() {
-    if (connectedClients.isEmpty) {
-      statusMessage = "无连接客户端";
-    } else {
-      statusMessage = "已连接客户端：${connectedClients.length}个";
-    }
+    // 不更新状态信息，保持显示IP和端口
     _notifyStatusChange();
   }
 
@@ -297,12 +348,22 @@ class SocketService {
       return;
     }
 
+    // 假设充气命令格式为："INFLATE:压力值"
+    final command = "INFLATE:$pressure";
+
     // 发送充气命令到所有Socket连接的客户端
     for (var socket in sockets) {
       try {
-        // 假设充气命令格式为："INFLATE:压力值"
-        final command = "INFLATE:$pressure";
         socket.write(command);
+
+        // 添加消息日志
+        final clientAddress =
+            "${socket.remoteAddress.address}:${socket.remotePort}";
+        _addMessageLog(
+          clientAddress: "Socket客户端: $clientAddress",
+          message: command,
+          isIncoming: false,
+        );
       } catch (e) {
         print("向Socket客户端发送命令失败: $e");
       }
@@ -311,8 +372,22 @@ class SocketService {
     // 发送充气命令到所有WebSocket连接的客户端
     for (var ws in webSockets) {
       try {
-        final command = "INFLATE:$pressure";
         ws.add(command);
+
+        // 查找客户端地址
+        String clientAddress = "WebSocket客户端";
+        for (String client in connectedClients) {
+          if (client.startsWith("WebSocket客户端")) {
+            clientAddress = client;
+            break;
+          }
+        }
+
+        _addMessageLog(
+          clientAddress: clientAddress,
+          message: command,
+          isIncoming: false,
+        );
       } catch (e) {
         print("向WebSocket客户端发送命令失败: $e");
       }
@@ -321,6 +396,28 @@ class SocketService {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text('已发送充气命令：$pressure')));
+  }
+
+  // 添加消息日志
+  void _addMessageLog({
+    required String clientAddress,
+    required String message,
+    required bool isIncoming,
+  }) {
+    final log = MessageLog(
+      clientAddress: clientAddress,
+      message: message,
+      timestamp: DateTime.now(),
+      isIncoming: isIncoming,
+    );
+
+    _messageLogs.add(log);
+    _notifyMessageLogChange();
+  }
+
+  // 通知消息日志变化
+  void _notifyMessageLogChange() {
+    _messageLogController.add(List.from(_messageLogs));
   }
 
   // 通知状态变化

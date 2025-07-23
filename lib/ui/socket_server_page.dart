@@ -14,6 +14,7 @@ class _SocketServerPageState extends State<SocketServerPage> {
   bool _isServerRunning = false;
   String _statusMessage = "服务未启动";
   List<String> _connectedClients = [];
+  List<MessageLog> _messageLogs = []; // 消息日志列表
 
   @override
   void initState() {
@@ -39,6 +40,13 @@ class _SocketServerPageState extends State<SocketServerPage> {
         _isServerRunning = running;
       });
     });
+
+    // 监听消息日志变化
+    _socketService.messageLogStream.listen((logs) {
+      setState(() {
+        _messageLogs = logs;
+      });
+    });
   }
 
   @override
@@ -61,9 +69,44 @@ class _SocketServerPageState extends State<SocketServerPage> {
           children: [
             _buildServerStatusCard(),
             const SizedBox(height: 16),
-            Text('已连接客户端', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            _buildClientsList(),
+            Expanded(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 左侧显示客户端列表
+                  Expanded(
+                    flex: 1,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '已连接客户端',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 8),
+                        Expanded(child: _buildClientsList()),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  // 右侧显示消息日志
+                  Expanded(
+                    flex: 2,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '消息日志',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 8),
+                        Expanded(child: _buildMessageLogsList()),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 16),
             _buildInflationControlCard(),
           ],
@@ -112,20 +155,62 @@ class _SocketServerPageState extends State<SocketServerPage> {
 
   // 客户端列表
   Widget _buildClientsList() {
-    return Expanded(
-      child: _connectedClients.isEmpty
-          ? const Center(child: Text('暂无连接的客户端'))
-          : ListView.builder(
-              itemCount: _connectedClients.length,
-              itemBuilder: (context, index) {
-                return ListTile(
-                  leading: const Icon(Icons.devices),
-                  title: Text(_connectedClients[index]),
-                  dense: true,
-                );
-              },
-            ),
-    );
+    return _connectedClients.isEmpty
+        ? const Center(child: Text('暂无连接的客户端'))
+        : ListView.builder(
+            itemCount: _connectedClients.length,
+            itemBuilder: (context, index) {
+              return ListTile(
+                leading: const Icon(Icons.devices),
+                title: Text(_connectedClients[index]),
+                dense: true,
+              );
+            },
+          );
+  }
+
+  // 消息日志列表
+  Widget _buildMessageLogsList() {
+    return _messageLogs.isEmpty
+        ? const Center(child: Text('暂无消息记录'))
+        : ListView.builder(
+            itemCount: _messageLogs.length,
+            reverse: true, // 最新的消息显示在底部
+            itemBuilder: (context, index) {
+              final log =
+                  _messageLogs[_messageLogs.length - 1 - index]; // 反转显示顺序
+              return Card(
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                color: log.isIncoming ? Colors.blue[50] : Colors.green[50],
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            log.clientAddress,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          Text(
+                            log.formattedTime,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text('${log.isIncoming ? '收到: ' : '发送: '}${log.message}'),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
   }
 
   // 充气控制卡片
