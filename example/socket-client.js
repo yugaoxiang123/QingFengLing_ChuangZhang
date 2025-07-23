@@ -6,8 +6,6 @@ const disconnectBtn = document.getElementById('disconnectBtn');
 const statusText = document.getElementById('status');
 const messageInput = document.getElementById('message');
 const sendBtn = document.getElementById('sendBtn');
-const pressureInput = document.getElementById('pressure');
-const inflateBtn = document.getElementById('inflateBtn');
 const messageLog = document.getElementById('messageLog');
 
 // WebSocket连接
@@ -30,7 +28,6 @@ function updateUIState(connected) {
     connectBtn.disabled = connected;
     disconnectBtn.disabled = !connected;
     sendBtn.disabled = !connected;
-    inflateBtn.disabled = !connected;
     
     statusText.textContent = connected ? '已连接' : '未连接';
     statusText.style.color = connected ? '#4CAF50' : '#cc0000';
@@ -66,13 +63,6 @@ function connectToServer() {
         socket.onmessage = (event) => {
             const message = event.data;
             logMessage(`收到消息: ${message}`, 'received');
-            
-            // 处理特定命令
-            if (message.startsWith('INFLATE:')) {
-                const pressure = message.split(':')[1];
-                logMessage(`收到充气命令，压力值: ${pressure}`, 'received');
-                // 在这里可以添加对充气命令的响应逻辑
-            }
         };
         
         socket.onclose = (event) => {
@@ -146,28 +136,6 @@ sendBtn.addEventListener('click', () => {
         socket.send(message);
         logMessage(`已发送: ${message}`, 'sent');
         messageInput.value = '';
-    } catch (error) {
-        logMessage(`发送失败: ${error.message}`, 'error');
-    }
-});
-
-// 发送充气命令
-inflateBtn.addEventListener('click', () => {
-    if (!socket) {
-        logMessage('未连接到服务器', 'error');
-        return;
-    }
-    
-    const pressure = pressureInput.value.trim();
-    if (!pressure) {
-        logMessage('请输入压力值', 'error');
-        return;
-    }
-    
-    try {
-        const command = `INFLATE:${pressure}`;
-        socket.send(command);
-        logMessage(`已发送充气命令: ${command}`, 'sent');
     } catch (error) {
         logMessage(`发送失败: ${error.message}`, 'error');
     }

@@ -1,9 +1,7 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:web_socket_channel/io.dart';
 
 // 消息日志类
 class MessageLog {
@@ -337,65 +335,6 @@ class SocketService {
     } catch (e) {
       print("获取IP地址失败: $e");
     }
-  }
-
-  // 发送充气命令
-  void sendInflationCommand(int pressure, BuildContext context) {
-    if (sockets.isEmpty && webSockets.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('没有连接的客户端')));
-      return;
-    }
-
-    // 假设充气命令格式为："INFLATE:压力值"
-    final command = "INFLATE:$pressure";
-
-    // 发送充气命令到所有Socket连接的客户端
-    for (var socket in sockets) {
-      try {
-        socket.write(command);
-
-        // 添加消息日志
-        final clientAddress =
-            "${socket.remoteAddress.address}:${socket.remotePort}";
-        _addMessageLog(
-          clientAddress: "Socket客户端: $clientAddress",
-          message: command,
-          isIncoming: false,
-        );
-      } catch (e) {
-        print("向Socket客户端发送命令失败: $e");
-      }
-    }
-
-    // 发送充气命令到所有WebSocket连接的客户端
-    for (var ws in webSockets) {
-      try {
-        ws.add(command);
-
-        // 查找客户端地址
-        String clientAddress = "WebSocket客户端";
-        for (String client in connectedClients) {
-          if (client.startsWith("WebSocket客户端")) {
-            clientAddress = client;
-            break;
-          }
-        }
-
-        _addMessageLog(
-          clientAddress: clientAddress,
-          message: command,
-          isIncoming: false,
-        );
-      } catch (e) {
-        print("向WebSocket客户端发送命令失败: $e");
-      }
-    }
-
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('已发送充气命令：$pressure')));
   }
 
   // 添加消息日志

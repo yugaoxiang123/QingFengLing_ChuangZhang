@@ -10,7 +10,6 @@ class SocketServerPage extends StatefulWidget {
 
 class _SocketServerPageState extends State<SocketServerPage> {
   final SocketService _socketService = SocketService();
-  int _inflationPressure = 0; // 充气压力值
   bool _isServerRunning = false;
   String _statusMessage = "服务未启动";
   List<String> _connectedClients = [];
@@ -107,8 +106,6 @@ class _SocketServerPageState extends State<SocketServerPage> {
                 ],
               ),
             ),
-            const SizedBox(height: 16),
-            _buildInflationControlCard(),
           ],
         ),
       ),
@@ -211,51 +208,5 @@ class _SocketServerPageState extends State<SocketServerPage> {
               );
             },
           );
-  }
-
-  // 充气控制卡片
-  Widget _buildInflationControlCard() {
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('充气控制', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Text('压力值: $_inflationPressure'),
-                Expanded(
-                  child: Slider(
-                    value: _inflationPressure.toDouble(),
-                    min: 0,
-                    max: 100,
-                    divisions: 20,
-                    label: _inflationPressure.toString(),
-                    onChanged: (double value) {
-                      setState(() {
-                        _inflationPressure = value.round();
-                      });
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            ElevatedButton(
-              onPressed: _isServerRunning
-                  ? () => _socketService.sendInflationCommand(
-                      _inflationPressure,
-                      context,
-                    )
-                  : null,
-              child: const Text('发送充气命令'),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
