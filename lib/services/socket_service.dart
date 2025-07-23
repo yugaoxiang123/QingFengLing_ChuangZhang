@@ -31,7 +31,10 @@ class SocketService {
     return _instance;
   }
 
-  SocketService._internal();
+  SocketService._internal() {
+    // 在初始化时自动启动服务
+    startServer();
+  }
 
   void dispose() {
     stopServer();
