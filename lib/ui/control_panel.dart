@@ -190,7 +190,6 @@ class _ControlPanelState extends State<ControlPanel> {
     setState(() {
       _isJumpExecuting = false;
       _jumpChargeLevel = 0.0;
-      _targetSpeed = 0.0; // 跃迁后直接将速度设为0
 
       // 跃迁完成后重置坐标到一个新的合理范围
       // 模拟跃迁到了一个新的区域
@@ -200,9 +199,21 @@ class _ControlPanelState extends State<ControlPanel> {
         'z': 70.0 + _random.nextDouble() * 30.0,
       };
 
+      // 检查跃迁前是否已经停止
+      bool wasStoppedBeforeJump = _shipSpeed <= 0.1 && _targetSpeed <= 0.1;
+
+      // 如果跃迁前已停止，保持停止状态；否则设置为默认巡航速度
+      if (wasStoppedBeforeJump) {
+        _targetSpeed = 0.0;
+        _shipSpeed = 0.0;
+      } else {
+        _targetSpeed = 20.0;
+        _shipSpeed = 20.0;
+      }
+
       _updateShipAttitude();
 
-      // 不需要恢复计时器，因为已经设置为0速度
+      // 取消跳跃恢复计时器
       _jumpRecoveryTimer?.cancel();
     });
   }
