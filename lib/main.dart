@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'ui/socket_server_page.dart';
 import 'ui/control_panel.dart';
+import 'services/socket_service.dart'; // 导入SocketService
 
 void main() {
+  // 确保Flutter框架初始化完成
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // 启动应用
   runApp(const MyApp());
 }
 
@@ -11,6 +16,11 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 在应用构建完成后初始化SocketService
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      socketService.initialize();
+    });
+
     return MaterialApp(
       title: '清峰岭控制面板',
       theme: ThemeData(
@@ -31,7 +41,7 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  int _selectedIndex = 1;
+  int _selectedIndex = 0;
 
   @override
   Widget build(BuildContext context) {

@@ -9,7 +9,8 @@ class SocketServerPage extends StatefulWidget {
 }
 
 class _SocketServerPageState extends State<SocketServerPage> {
-  final SocketService _socketService = SocketService();
+  // 使用全局单例实例
+  final SocketService _socketService = socketService;
   bool _isServerRunning = false;
   String _statusMessage = "服务未启动";
   List<ClientConnection> _connectedClients = []; // 更新为ClientConnection类型
@@ -22,6 +23,20 @@ class _SocketServerPageState extends State<SocketServerPage> {
   void initState() {
     super.initState();
     _setupListeners();
+    // 初始化页面状态
+    _updateInitialState();
+  }
+
+  // 添加初始状态更新方法
+  void _updateInitialState() {
+    // 直接从socketService获取当前状态
+    setState(() {
+      _isServerRunning = _socketService.isServerRunning;
+      _statusMessage = _socketService.statusMessage;
+      _connectedClients = List.from(_socketService.clientConnections);
+      // 初始化空消息列表，后续通过Stream更新
+      _messageLogs = [];
+    });
   }
 
   void _setupListeners() {
@@ -54,7 +69,7 @@ class _SocketServerPageState extends State<SocketServerPage> {
   @override
   void dispose() {
     _testMessageController.dispose(); // 释放控制器
-    _socketService.dispose();
+    // 不再调用_socketService.dispose()，因为它是全局单例
     super.dispose();
   }
 

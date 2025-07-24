@@ -48,6 +48,9 @@ class ClientConnection {
   }
 }
 
+// 全局访问点
+final socketService = SocketService();
+
 class SocketService {
   bool isServerRunning = false;
   String statusMessage = "服务未启动";
@@ -88,10 +91,15 @@ class SocketService {
   }
 
   SocketService._internal() {
-    // 在初始化时自动启动服务
-    startServer();
-    // 监听应用生命周期状态
+    // 不在构造函数中启动服务，改为延迟初始化
+    // 只设置生命周期监听
     _setupAppLifecycleListener();
+  }
+
+  // 添加初始化方法，在应用启动后调用
+  Future<void> initialize() async {
+    // 启动服务器
+    await startServer();
   }
 
   void _setupAppLifecycleListener() {
