@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../services/socket_service.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 
 class ShipManualControl extends StatefulWidget {
   const ShipManualControl({super.key});
@@ -13,6 +15,9 @@ class ShipManualControl extends StatefulWidget {
 
 class _ShipManualControlState extends State<ShipManualControl>
     with SingleTickerProviderStateMixin {
+  // 键盘焦点节点
+  final FocusNode _keyboardFocusNode = FocusNode();
+
   // 控制按钮按下状态
   bool _forwardPressed = false;
   bool _backwardPressed = false;
@@ -98,6 +103,11 @@ class _ShipManualControlState extends State<ShipManualControl>
         }
       });
     });
+
+    // 请求焦点以接收键盘事件
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _keyboardFocusNode.requestFocus();
+    });
   }
 
   @override
@@ -108,7 +118,89 @@ class _ShipManualControlState extends State<ShipManualControl>
     _jumpExecuteTimer?.cancel();
     _jumpPulseTimer?.cancel();
     _shipAnimController.dispose();
+    _keyboardFocusNode.dispose();
     super.dispose();
+  }
+
+  // 处理键盘按键事件
+  void _handleKeyEvent(KeyEvent event) {
+    if (event is KeyDownEvent) {
+      // 按键按下
+      switch (event.logicalKey) {
+        case LogicalKeyboardKey.keyW:
+          if (!_forwardPressed) {
+            setState(() => _forwardPressed = true);
+            _startCommand('FORWARD');
+          }
+          break;
+        case LogicalKeyboardKey.keyA:
+          if (!_leftPressed) {
+            setState(() => _leftPressed = true);
+            _startCommand('LEFT');
+          }
+          break;
+        case LogicalKeyboardKey.keyD:
+          if (!_rightPressed) {
+            setState(() => _rightPressed = true);
+            _startCommand('RIGHT');
+          }
+          break;
+        case LogicalKeyboardKey.keyS:
+          if (!_backwardPressed) {
+            setState(() => _backwardPressed = true);
+            _startCommand('BACKWARD');
+          }
+          break;
+        case LogicalKeyboardKey.space:
+          if (!_thrustPressed) {
+            setState(() => _thrustPressed = true);
+            _startCommand('THRUST');
+          }
+          break;
+        case LogicalKeyboardKey.enter:
+        case LogicalKeyboardKey.numpadEnter:
+          if (!_isJumpCharging && !_isJumpCharged && !_isJumpExecuting) {
+            _startJumpCharge();
+          } else if (_isJumpCharging && !_isJumpExecuting) {
+            _cancelJump();
+          }
+          break;
+      }
+    } else if (event is KeyUpEvent) {
+      // 按键释放
+      switch (event.logicalKey) {
+        case LogicalKeyboardKey.keyW:
+          if (_forwardPressed) {
+            setState(() => _forwardPressed = false);
+            _endCommand('FORWARD');
+          }
+          break;
+        case LogicalKeyboardKey.keyA:
+          if (_leftPressed) {
+            setState(() => _leftPressed = false);
+            _endCommand('LEFT');
+          }
+          break;
+        case LogicalKeyboardKey.keyD:
+          if (_rightPressed) {
+            setState(() => _rightPressed = false);
+            _endCommand('RIGHT');
+          }
+          break;
+        case LogicalKeyboardKey.keyS:
+          if (_backwardPressed) {
+            setState(() => _backwardPressed = false);
+            _endCommand('BACKWARD');
+          }
+          break;
+        case LogicalKeyboardKey.space:
+          if (_thrustPressed) {
+            setState(() => _thrustPressed = false);
+            _endCommand('THRUST');
+          }
+          break;
+      }
+    }
   }
 
   // 发送控制命令到服务器
@@ -388,149 +480,156 @@ class _ShipManualControlState extends State<ShipManualControl>
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: Theme.of(
-          context,
-        ).colorScheme.surfaceContainerHighest.withAlpha((0.7 * 255).round()),
-        borderRadius: BorderRadius.circular(16.0),
-        border: Border.all(
+    return KeyboardListener(
+      focusNode: _keyboardFocusNode,
+      onKeyEvent: _handleKeyEvent,
+      autofocus: true,
+      child: Container(
+        padding: const EdgeInsets.all(16.0),
+        decoration: BoxDecoration(
           color: Theme.of(
             context,
-          ).colorScheme.primary.withAlpha((0.3 * 255).round()),
-          width: 2,
+          ).colorScheme.surfaceContainerHighest.withAlpha((0.7 * 255).round()),
+          borderRadius: BorderRadius.circular(16.0),
+          border: Border.all(
+            color: Theme.of(
+              context,
+            ).colorScheme.primary.withAlpha((0.3 * 255).round()),
+            width: 2,
+          ),
         ),
-      ),
-      margin: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // 标题
-          Text(
-            '飞船手动控制',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).colorScheme.primary,
+        margin: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // 标题
+            Text(
+              '飞船手动控制',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.primary,
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
+            const SizedBox(height: 16),
 
-          // 飞船图标显示
-          _buildShipIcon(context),
-          const SizedBox(height: 24),
+            // 删除单独的键盘控制提示区块
 
-          // 主控制区域
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // 左侧方向控制
-              Column(
-                children: [
-                  // 前进按钮
-                  _buildControlButton(
-                    icon: Icons.arrow_upward_rounded,
-                    label: '前进',
-                    isPressed: _forwardPressed,
-                    onPressed: () {
-                      setState(() => _forwardPressed = true);
-                      _startCommand('FORWARD');
-                    },
-                    onReleased: () {
-                      setState(() => _forwardPressed = false);
-                      _endCommand('FORWARD');
-                    },
-                    color: Colors.blue,
-                  ),
-                  const SizedBox(height: 8),
+            // 飞船图标显示
+            _buildShipIcon(context),
+            const SizedBox(height: 24),
 
-                  // 左右控制按钮
-                  Row(
-                    children: [
-                      // 左转按钮
-                      _buildControlButton(
-                        icon: Icons.arrow_back_rounded,
-                        label: '左转',
-                        isPressed: _leftPressed,
-                        onPressed: () {
-                          setState(() => _leftPressed = true);
-                          _startCommand('LEFT');
-                        },
-                        onReleased: () {
-                          setState(() => _leftPressed = false);
-                          _endCommand('LEFT');
-                        },
-                        color: Colors.green,
-                      ),
-                      const SizedBox(width: 44),
+            // 主控制区域
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // 左侧方向控制
+                Column(
+                  children: [
+                    // 前进按钮
+                    _buildControlButton(
+                      icon: Icons.arrow_upward_rounded,
+                      label: '前进 (W)', // 添加键盘提示
+                      isPressed: _forwardPressed,
+                      onPressed: () {
+                        setState(() => _forwardPressed = true);
+                        _startCommand('FORWARD');
+                      },
+                      onReleased: () {
+                        setState(() => _forwardPressed = false);
+                        _endCommand('FORWARD');
+                      },
+                      color: Colors.blue,
+                    ),
+                    const SizedBox(height: 8),
 
-                      // 右转按钮
-                      _buildControlButton(
-                        icon: Icons.arrow_forward_rounded,
-                        label: '右转',
-                        isPressed: _rightPressed,
-                        onPressed: () {
-                          setState(() => _rightPressed = true);
-                          _startCommand('RIGHT');
-                        },
-                        onReleased: () {
-                          setState(() => _rightPressed = false);
-                          _endCommand('RIGHT');
-                        },
-                        color: Colors.green,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
+                    // 左右控制按钮
+                    Row(
+                      children: [
+                        // 左转按钮
+                        _buildControlButton(
+                          icon: Icons.arrow_back_rounded,
+                          label: '左转 (A)', // 添加键盘提示
+                          isPressed: _leftPressed,
+                          onPressed: () {
+                            setState(() => _leftPressed = true);
+                            _startCommand('LEFT');
+                          },
+                          onReleased: () {
+                            setState(() => _leftPressed = false);
+                            _endCommand('LEFT');
+                          },
+                          color: Colors.green,
+                        ),
+                        const SizedBox(width: 84),
 
-                  // 后退按钮
-                  _buildControlButton(
-                    icon: Icons.arrow_downward_rounded,
-                    label: '减速',
-                    isPressed: _backwardPressed,
-                    onPressed: () {
-                      setState(() => _backwardPressed = true);
-                      _startCommand('BACKWARD');
-                    },
-                    onReleased: () {
-                      setState(() => _backwardPressed = false);
-                      _endCommand('BACKWARD');
-                    },
-                    color: Colors.orange,
-                  ),
-                ],
-              ),
+                        // 右转按钮
+                        _buildControlButton(
+                          icon: Icons.arrow_forward_rounded,
+                          label: '右转 (D)', // 添加键盘提示
+                          isPressed: _rightPressed,
+                          onPressed: () {
+                            setState(() => _rightPressed = true);
+                            _startCommand('RIGHT');
+                          },
+                          onReleased: () {
+                            setState(() => _rightPressed = false);
+                            _endCommand('RIGHT');
+                          },
+                          color: Colors.green,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
 
-              const SizedBox(width: 32),
+                    // 后退按钮
+                    _buildControlButton(
+                      icon: Icons.arrow_downward_rounded,
+                      label: '减速 (S)', // 添加键盘提示
+                      isPressed: _backwardPressed,
+                      onPressed: () {
+                        setState(() => _backwardPressed = true);
+                        _startCommand('BACKWARD');
+                      },
+                      onReleased: () {
+                        setState(() => _backwardPressed = false);
+                        _endCommand('BACKWARD');
+                      },
+                      color: Colors.orange,
+                    ),
+                  ],
+                ),
 
-              // 右侧推进和跃迁控制
-              Column(
-                children: [
-                  // 推进按钮
-                  _buildControlButton(
-                    icon: Icons.rocket_launch,
-                    label: '推进',
-                    isPressed: _thrustPressed,
-                    onPressed: () {
-                      setState(() => _thrustPressed = true);
-                      _startCommand('THRUST');
-                    },
-                    onReleased: () {
-                      setState(() => _thrustPressed = false);
-                      _endCommand('THRUST');
-                    },
-                    color: Colors.red,
-                    size: 80,
-                  ),
-                  const SizedBox(height: 16),
+                const SizedBox(width: 32),
 
-                  // 跃迁控制
-                  _buildJumpControl(context),
-                ],
-              ),
-            ],
-          ),
-        ],
+                // 右侧推进和跃迁控制
+                Column(
+                  children: [
+                    // 推进按钮
+                    _buildControlButton(
+                      icon: Icons.rocket_launch,
+                      label: '推进 (空格)', // 添加键盘提示
+                      isPressed: _thrustPressed,
+                      onPressed: () {
+                        setState(() => _thrustPressed = true);
+                        _startCommand('THRUST');
+                      },
+                      onReleased: () {
+                        setState(() => _thrustPressed = false);
+                        _endCommand('THRUST');
+                      },
+                      color: Colors.red,
+                      size: 80,
+                    ),
+                    const SizedBox(height: 16),
+
+                    // 跃迁控制
+                    _buildJumpControl(context),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -962,7 +1061,7 @@ class _ShipManualControlState extends State<ShipManualControl>
           onLongPressEnd: _isJumpExecuting ? null : (_) => {},
           onTap: _isJumpCharging && !_isJumpExecuting ? _cancelJump : null,
           child: Container(
-            width: 120,
+            width: 180,
             height: 50,
             decoration: BoxDecoration(
               color: _isJumpExecuting
@@ -1011,10 +1110,10 @@ class _ShipManualControlState extends State<ShipManualControl>
                     ? '跃迁准备就绪!'
                     : _isJumpCharging
                     ? '跃迁充能中...'
-                    : '长按开始跃迁',
+                    : '长按开始跃迁 (回车)', // 添加回车键提示
                 style: TextStyle(
                   color: _isJumpExecuting
-                      ? Colors.white.withOpacity(0.7)
+                      ? Colors.white.withAlpha((0.7 * 255).round())
                       : _isJumpCharging || _isJumpCharged
                       ? Colors.white
                       : Colors.purple,
