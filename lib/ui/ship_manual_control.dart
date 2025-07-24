@@ -20,10 +20,21 @@ class _ShipManualControlState extends State<ShipManualControl>
   bool _rightPressed = false;
   bool _thrustPressed = false;
 
-  // 跃迁充能状态
+  // 跃迁状态
   double _jumpChargeLevel = 0;
   bool _isJumpCharging = false;
+  bool _isJumpCharged = false;
+  bool _isJumpExecuting = false; // 跃迁执行中状态
   Timer? _jumpChargeTimer;
+  Timer? _jumpChargedBlinkTimer;
+  Timer? _jumpExecuteTimer; // 跃迁执行计时器
+  Timer? _jumpPulseTimer; // 跃迁脉冲效果计时器
+  double _jumpChargedGlowOpacity = 0.0;
+  double _jumpPulseEffect = 0.0; // 跃迁脉冲效果
+
+  // 跃迁粒子效果
+  List<JumpParticle> _jumpParticles = [];
+  Timer? _particleTimer;
 
   // 飞船动画控制器
   late AnimationController _shipAnimController;
@@ -35,6 +46,9 @@ class _ShipManualControlState extends State<ShipManualControl>
   // 添加前进/减速发光效果
   double _forwardGlowOpacity = 0.0;
   double _backwardGlowOpacity = 0.0;
+  // 跃迁动画变量
+  double _jumpExecuteOpacity = 0.0; // 跃迁执行时的不透明度
+  double _jumpExecuteScale = 1.0; // 跃迁执行时的缩放
 
   @override
   void initState() {
@@ -89,6 +103,10 @@ class _ShipManualControlState extends State<ShipManualControl>
   @override
   void dispose() {
     _jumpChargeTimer?.cancel();
+    _jumpChargedBlinkTimer?.cancel();
+    _particleTimer?.cancel();
+    _jumpExecuteTimer?.cancel();
+    _jumpPulseTimer?.cancel();
     _shipAnimController.dispose();
     super.dispose();
   }
@@ -149,22 +167,24 @@ class _ShipManualControlState extends State<ShipManualControl>
 
   // 开始充能跃迁
   void _startJumpCharge() {
-    if (_isJumpCharging) return;
+    if (_isJumpCharging || _isJumpExecuting) return;
 
     setState(() {
       _isJumpCharging = true;
       _jumpChargeLevel = 0;
+      _isJumpCharged = false;
     });
 
-    _jumpChargeTimer = Timer.periodic(const Duration(milliseconds: 100), (
+    _jumpChargeTimer = Timer.periodic(const Duration(milliseconds: 50), (
       timer,
     ) {
       setState(() {
         if (_jumpChargeLevel < 1.0) {
-          _jumpChargeLevel = (_jumpChargeLevel + 0.02).clamp(0.0, 1.0);
+          _jumpChargeLevel = (_jumpChargeLevel + 0.04).clamp(0.0, 1.0);
         } else {
           _jumpChargeLevel = 1.0;
           _jumpChargeTimer?.cancel();
+          _onJumpChargeComplete();
         }
       });
     });
@@ -172,13 +192,96 @@ class _ShipManualControlState extends State<ShipManualControl>
     _sendCommand('START_JUMP_CHARGE');
   }
 
+  // 跃迁充能完成
+  void _onJumpChargeComplete() {
+    setState(() {
+      _isJumpCharged = true;
+    });
+
+    // 发送充能完成命令
+    _sendCommand('JUMP_CHARGE_COMPLETE');
+
+    // 创建闪烁效果
+    _jumpChargedBlinkTimer = Timer.periodic(const Duration(milliseconds: 300), (
+      timer,
+    ) {
+      setState(() {
+        _jumpChargedGlowOpacity = _jumpChargedGlowOpacity > 0.5 ? 0.2 : 1.0;
+      });
+    });
+
+    // 创建粒子效果
+    _startJumpParticles();
+
+    // 自动开始执行跃迁
+    _executeJump();
+  }
+
+  // 创建跃迁粒子效果
+  void _startJumpParticles() {
+    // 清除现有粒子
+    _jumpParticles.clear();
+    _particleTimer?.cancel();
+
+    // 创建初始粒子
+    for (int i = 0; i < 20; i++) {
+      _jumpParticles.add(JumpParticle.random());
+    }
+
+    // 更新粒子动画
+    _particleTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
+      if (!_isJumpCharged && !_isJumpExecuting) {
+        timer.cancel();
+        _jumpParticles.clear();
+        return;
+      }
+
+      setState(() {
+        // 更新现有粒子
+        for (var particle in _jumpParticles) {
+          particle.update();
+        }
+
+        // 移除消失的粒子
+        _jumpParticles.removeWhere((particle) => particle.alpha <= 0);
+
+        // 添加新粒子 - 在跃迁执行过程中增加更多粒子
+        if (_isJumpExecuting) {
+          // 跃迁执行过程中，更积极地添加粒子
+          if (_jumpParticles.length < 50 && math.Random().nextDouble() > 0.5) {
+            _jumpParticles.add(
+              JumpParticle.random(
+                // 跃迁执行中，粒子寿命更长
+                alphaDecay: 0.005,
+                // 跃迁执行中，粒子速度更快
+                speedMultiplier: 1.5,
+              ),
+            );
+          }
+        } else if (_jumpParticles.length < 30 &&
+            math.Random().nextDouble() > 0.7) {
+          _jumpParticles.add(JumpParticle.random());
+        }
+      });
+    });
+  }
+
   // 执行跃迁
   void _executeJump() {
-    if (!_isJumpCharging) return;
+    if (!_isJumpCharging && !_isJumpCharged) return;
 
+    // 取消充能和闪烁计时器
     _jumpChargeTimer?.cancel();
+    _jumpChargedBlinkTimer?.cancel();
+
+    // 设置跃迁执行状态
     setState(() {
       _isJumpCharging = false;
+      _isJumpCharged = false;
+      _isJumpExecuting = true;
+      _jumpExecuteOpacity = 0.0;
+      _jumpExecuteScale = 1.0;
+      _jumpPulseEffect = 0.0;
     });
 
     // 根据充能程度发送不同的跃迁命令
@@ -190,18 +293,95 @@ class _ShipManualControlState extends State<ShipManualControl>
       _sendCommand('EXECUTE_JUMP_SHORT');
     }
 
-    // 重置充能
-    setState(() {
-      _jumpChargeLevel = 0;
+    // 开始跃迁动画
+    _startJumpExecuteAnimation();
+
+    // 开始脉冲效果
+    _startJumpPulseEffect();
+  }
+
+  // 开始跃迁脉冲效果
+  void _startJumpPulseEffect() {
+    _jumpPulseTimer?.cancel();
+    _jumpPulseTimer = Timer.periodic(const Duration(milliseconds: 300), (
+      timer,
+    ) {
+      if (!_isJumpExecuting) {
+        timer.cancel();
+        return;
+      }
+
+      setState(() {
+        // 脉冲效果在0.2和1.0之间变化
+        _jumpPulseEffect = _jumpPulseEffect > 0.6 ? 0.2 : 1.0;
+      });
     });
+  }
+
+  // 开始跃迁执行动画
+  void _startJumpExecuteAnimation() {
+    // 创建跃迁执行动画
+    _jumpExecuteTimer = Timer.periodic(const Duration(milliseconds: 50), (
+      timer,
+    ) {
+      setState(() {
+        // 前2秒：增加不透明度和缩放
+        if (timer.tick < 40) {
+          _jumpExecuteOpacity = (timer.tick / 40).clamp(0.0, 1.0);
+          _jumpExecuteScale = 1.0 + (timer.tick / 40) * 0.5;
+        }
+        // 中间2秒：保持最大效果
+        else if (timer.tick < 80) {
+          _jumpExecuteOpacity = 1.0;
+          _jumpExecuteScale = 1.5;
+        }
+        // 最后2秒：减少不透明度和缩放
+        else if (timer.tick < 120) {
+          _jumpExecuteOpacity = (1.0 - (timer.tick - 80) / 40).clamp(0.0, 1.0);
+          _jumpExecuteScale = 1.5 - ((timer.tick - 80) / 40) * 0.5;
+        }
+        // 结束动画
+        else {
+          _jumpExecuteTimer?.cancel();
+          _onJumpExecuteComplete();
+        }
+      });
+    });
+  }
+
+  // 跃迁执行完成
+  void _onJumpExecuteComplete() {
+    _jumpPulseTimer?.cancel();
+    setState(() {
+      _isJumpExecuting = false;
+      _jumpChargeLevel = 0;
+      _jumpExecuteOpacity = 0.0;
+      _jumpExecuteScale = 1.0;
+      _jumpPulseEffect = 0.0;
+      _jumpParticles.clear();
+    });
+
+    // 发送跃迁完成命令
+    _sendCommand('JUMP_COMPLETE');
+
+    // 清除粒子效果
+    _particleTimer?.cancel();
   }
 
   // 取消跃迁
   void _cancelJump() {
+    // 如果正在执行跃迁，则不允许取消
+    if (_isJumpExecuting) return;
+
     _jumpChargeTimer?.cancel();
+    _jumpChargedBlinkTimer?.cancel();
+    _particleTimer?.cancel();
     setState(() {
       _isJumpCharging = false;
+      _isJumpCharged = false;
       _jumpChargeLevel = 0;
+      _jumpChargedGlowOpacity = 0.0;
+      _jumpParticles.clear();
     });
     _sendCommand('CANCEL_JUMP');
   }
@@ -213,7 +393,7 @@ class _ShipManualControlState extends State<ShipManualControl>
       decoration: BoxDecoration(
         color: Theme.of(
           context,
-        ).colorScheme.surfaceVariant.withAlpha((0.7 * 255).round()),
+        ).colorScheme.surfaceContainerHighest.withAlpha((0.7 * 255).round()),
         borderRadius: BorderRadius.circular(16.0),
         border: Border.all(
           color: Theme.of(
@@ -360,6 +540,7 @@ class _ShipManualControlState extends State<ShipManualControl>
     return Container(
       width: 120,
       height: 120,
+      clipBehavior: Clip.none, // 确保不裁剪子元素
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
         shape: BoxShape.circle,
@@ -373,63 +554,243 @@ class _ShipManualControlState extends State<ShipManualControl>
           ),
         ],
       ),
-      child: Center(
-        child: Transform.translate(
-          offset: Offset(0, _shipYOffset),
-          child: Transform.rotate(
-            angle: _shipRotation,
-            child: Transform.scale(
-              scale: _shipScale,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  // 飞船主体
-                  Container(
-                    width: 60,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary,
-                      borderRadius: BorderRadius.circular(30),
+      child: Stack(
+        clipBehavior: Clip.none, // 确保Stack不裁剪子元素
+        alignment: Alignment.center,
+        children: [
+          // 跃迁执行效果 - 使用环形光晕而不是方块
+          if (_isJumpExecuting) ...[
+            // 最外层光环 - 放在Container外部以避免被裁剪
+            Positioned(
+              left: -20, // 扩展到Container外部
+              top: -20,
+              child: Transform.scale(
+                scale: _jumpExecuteScale,
+                child: Container(
+                  width: 160, // 增大尺寸确保完全覆盖
+                  height: 160,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.transparent,
+                    border: Border.all(
+                      color: Colors.purple.withAlpha(
+                        (_jumpExecuteOpacity * 180).round(),
+                      ),
+                      width: 8,
                     ),
                   ),
-                  // 飞船机翼
-                  Positioned(
-                    top: 40,
+                ),
+              ),
+            ),
+
+            // 中层光环
+            Positioned(
+              left: -10,
+              top: -10,
+              child: Transform.scale(
+                scale: _jumpExecuteScale * 0.85,
+                child: Container(
+                  width: 140,
+                  height: 140,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.transparent,
+                    border: Border.all(
+                      color: Colors.purple.withAlpha(
+                        (_jumpExecuteOpacity * 150).round(),
+                      ),
+                      width: 4,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            // 内层光环
+            Transform.scale(
+              scale: _jumpExecuteScale * 0.7,
+              child: Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.transparent,
+                  border: Border.all(
+                    color: Colors.purple.withAlpha(
+                      (_jumpPulseEffect * 255).round(),
+                    ),
+                    width: 2,
+                  ),
+                ),
+              ),
+            ),
+          ],
+
+          // 跃迁充能效果
+          if (_isJumpCharging && !_isJumpCharged && !_isJumpExecuting)
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.purple.withAlpha(
+                    (_jumpChargeLevel.clamp(0.0, 1.0) * 255).round(),
+                  ),
+                  width: 3,
+                ),
+              ),
+            ),
+
+          // 跃迁充能完成闪烁效果
+          if (_isJumpCharged && !_isJumpExecuting)
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.purple, width: 3),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.purple.withAlpha(
+                      (_jumpChargedGlowOpacity * 255).round(),
+                    ),
+                    blurRadius: 15,
+                    spreadRadius: 5,
+                  ),
+                ],
+              ),
+            ),
+
+          // 跃迁粒子效果
+          if (_isJumpCharged || _isJumpExecuting)
+            ..._jumpParticles
+                .map(
+                  (particle) => Positioned(
+                    left: particle.x,
+                    top: particle.y,
                     child: Container(
-                      width: 100,
-                      height: 20,
+                      width: particle.size,
+                      height: particle.size,
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.secondary,
-                        borderRadius: BorderRadius.circular(10),
+                        shape: BoxShape.circle,
+                        color: Colors.purple.withAlpha(
+                          (particle.alpha * 255).round(),
+                        ),
                       ),
                     ),
                   ),
-                  // 飞船引擎
-                  Positioned(
-                    bottom: 10,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        // 引擎发光效果
-                        if (_engineGlowOpacity > 0)
-                          Container(
+                )
+                .toList(),
+
+          // 飞船主体 - 确保放在最上层
+          Center(
+            child: Transform.translate(
+              offset: Offset(0, _shipYOffset),
+              child: Transform.rotate(
+                angle: _shipRotation,
+                child: Transform.scale(
+                  scale: _isJumpExecuting
+                      ? _jumpExecuteScale * 0.8
+                      : _shipScale,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      // 飞船主体
+                      Container(
+                        width: 60,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primary,
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                      ),
+                      // 飞船机翼
+                      Positioned(
+                        top: 40,
+                        child: Container(
+                          width: 100,
+                          height: 20,
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.secondary,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
+                      // 飞船引擎
+                      Positioned(
+                        bottom: 10,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            // 引擎发光效果
+                            if (_engineGlowOpacity > 0 || _isJumpExecuting)
+                              Container(
+                                width: 40,
+                                height: 20,
+                                decoration: BoxDecoration(
+                                  color: _isJumpExecuting
+                                      ? Colors.purple.withAlpha(
+                                          (_jumpExecuteOpacity * 255).round(),
+                                        )
+                                      : Colors.orange.withAlpha(
+                                          (_engineGlowOpacity.clamp(0.0, 1.0) *
+                                                  255)
+                                              .round(),
+                                        ),
+                                  borderRadius: BorderRadius.circular(10),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: _isJumpExecuting
+                                          ? Colors.purple.withAlpha(
+                                              (_jumpExecuteOpacity * 200)
+                                                  .round(),
+                                            )
+                                          : Colors.orange.withAlpha(
+                                              ((_engineGlowOpacity * 0.8).clamp(
+                                                        0.0,
+                                                        1.0,
+                                                      ) *
+                                                      255)
+                                                  .round(),
+                                            ),
+                                      blurRadius: 15,
+                                      spreadRadius: _isJumpExecuting ? 5 : 2,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            // 引擎主体
+                            Container(
+                              width: 30,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                color: _isJumpExecuting
+                                    ? Colors.purple
+                                    : Colors.orange,
+                                borderRadius: BorderRadius.circular(5),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // 前进发光效果
+                      if (_forwardGlowOpacity > 0 && !_isJumpExecuting)
+                        Positioned(
+                          top: -5,
+                          child: Container(
                             width: 40,
                             height: 20,
                             decoration: BoxDecoration(
-                              color: Colors.orange.withAlpha(
-                                (_engineGlowOpacity.clamp(0.0, 1.0) * 255)
-                                    .round(),
+                              color: Colors.blue.withAlpha(
+                                (_forwardGlowOpacity * 255).round(),
                               ),
                               borderRadius: BorderRadius.circular(10),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.orange.withAlpha(
-                                    ((_engineGlowOpacity * 0.8).clamp(
-                                              0.0,
-                                              1.0,
-                                            ) *
-                                            255)
-                                        .round(),
+                                  color: Colors.blue.withAlpha(
+                                    (_forwardGlowOpacity * 0.8 * 255).round(),
                                   ),
                                   blurRadius: 15,
                                   spreadRadius: 2,
@@ -437,101 +798,54 @@ class _ShipManualControlState extends State<ShipManualControl>
                               ],
                             ),
                           ),
-                        // 引擎主体
-                        Container(
-                          width: 30,
-                          height: 10,
-                          decoration: BoxDecoration(
-                            color: Colors.orange,
-                            borderRadius: BorderRadius.circular(5),
-                          ),
                         ),
-                      ],
-                    ),
-                  ),
 
-                  // 前进发光效果
-                  if (_forwardGlowOpacity > 0)
-                    Positioned(
-                      top: -5,
-                      child: Container(
-                        width: 40,
-                        height: 20,
-                        decoration: BoxDecoration(
-                          color: Colors.blue.withAlpha(
-                            (_forwardGlowOpacity * 255).round(),
-                          ),
-                          borderRadius: BorderRadius.circular(10),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.blue.withAlpha(
-                                (_forwardGlowOpacity * 0.8 * 255).round(),
-                              ),
-                              blurRadius: 15,
-                              spreadRadius: 2,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                  // 减速发光效果
-                  if (_backwardGlowOpacity > 0)
-                    Positioned(
-                      top: 70,
-                      child: Container(
-                        width: 40,
-                        height: 20,
-                        decoration: BoxDecoration(
-                          color: Colors.orange.withAlpha(
-                            (_backwardGlowOpacity * 255).round(),
-                          ),
-                          borderRadius: BorderRadius.circular(10),
-                          boxShadow: [
-                            BoxShadow(
+                      // 减速发光效果
+                      if (_backwardGlowOpacity > 0 && !_isJumpExecuting)
+                        Positioned(
+                          top: 70,
+                          child: Container(
+                            width: 40,
+                            height: 20,
+                            decoration: BoxDecoration(
                               color: Colors.orange.withAlpha(
-                                (_backwardGlowOpacity * 0.8 * 255).round(),
+                                (_backwardGlowOpacity * 255).round(),
                               ),
-                              blurRadius: 15,
-                              spreadRadius: 2,
+                              borderRadius: BorderRadius.circular(10),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.orange.withAlpha(
+                                    (_backwardGlowOpacity * 0.8 * 255).round(),
+                                  ),
+                                  blurRadius: 15,
+                                  spreadRadius: 2,
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                  // 飞船窗口
-                  Positioned(
-                    top: 20,
-                    child: Container(
-                      width: 30,
-                      height: 15,
-                      decoration: BoxDecoration(
-                        color: Colors.lightBlue.withAlpha((0.7 * 255).round()),
-                        borderRadius: BorderRadius.circular(7.5),
-                      ),
-                    ),
-                  ),
-                  // 跃迁充能效果
-                  if (_isJumpCharging)
-                    Container(
-                      width: 120,
-                      height: 120,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.purple.withAlpha(
-                            (_jumpChargeLevel.clamp(0.0, 1.0) * 255).round(),
                           ),
-                          width: 3,
+                        ),
+
+                      // 飞船窗口
+                      Positioned(
+                        top: 20,
+                        child: Container(
+                          width: 30,
+                          height: 15,
+                          decoration: BoxDecoration(
+                            color: Colors.lightBlue.withAlpha(
+                              (0.7 * 255).round(),
+                            ),
+                            borderRadius: BorderRadius.circular(7.5),
+                          ),
                         ),
                       ),
-                    ),
-                ],
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -599,14 +913,39 @@ class _ShipManualControlState extends State<ShipManualControl>
           decoration: BoxDecoration(
             color: Colors.black26,
             borderRadius: BorderRadius.circular(10),
+            boxShadow: _isJumpCharged
+                ? [
+                    BoxShadow(
+                      color: Colors.purple.withAlpha(
+                        (_jumpChargedGlowOpacity * 150).round(),
+                      ),
+                      blurRadius: 10,
+                      spreadRadius: 2,
+                    ),
+                  ]
+                : _isJumpExecuting
+                ? [
+                    BoxShadow(
+                      color: Colors.purple.withAlpha(
+                        (_jumpExecuteOpacity * 150).round(),
+                      ),
+                      blurRadius: 10 + (_jumpPulseEffect * 5),
+                      spreadRadius: 2 + (_jumpPulseEffect * 3),
+                    ),
+                  ]
+                : [],
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(10),
             child: LinearProgressIndicator(
-              value: _jumpChargeLevel,
+              value: _isJumpExecuting ? _jumpExecuteOpacity : _jumpChargeLevel,
               backgroundColor: Colors.transparent,
               valueColor: AlwaysStoppedAnimation<Color>(
-                _jumpChargeLevel < 0.5
+                _isJumpExecuting
+                    ? Colors.purple.withAlpha((_jumpPulseEffect * 255).round())
+                    : _isJumpCharged
+                    ? Colors.purple
+                    : _jumpChargeLevel < 0.5
                     ? Colors.blue
                     : _jumpChargeLevel < 0.8
                     ? Colors.yellow
@@ -619,23 +958,46 @@ class _ShipManualControlState extends State<ShipManualControl>
 
         // 跃迁按钮
         GestureDetector(
-          onLongPressStart: (_) => _startJumpCharge(),
-          onLongPressEnd: (_) => _executeJump(),
-          onTap: _isJumpCharging ? _cancelJump : null,
+          onLongPressStart: _isJumpExecuting ? null : (_) => _startJumpCharge(),
+          onLongPressEnd: _isJumpExecuting ? null : (_) => {},
+          onTap: _isJumpCharging && !_isJumpExecuting ? _cancelJump : null,
           child: Container(
             width: 120,
             height: 50,
             decoration: BoxDecoration(
-              color: _isJumpCharging
+              color: _isJumpExecuting
+                  ? Colors.grey.withAlpha((0.5 * 255).round())
+                  : _isJumpCharged
+                  ? Colors.purple.withAlpha(
+                      (_jumpChargedGlowOpacity * 255).round(),
+                    )
+                  : _isJumpCharging
                   ? Colors.purple.withAlpha((0.8 * 255).round())
                   : Colors.purple.withAlpha((0.3 * 255).round()),
               borderRadius: BorderRadius.circular(25),
-              border: Border.all(color: Colors.purple, width: 2),
-              boxShadow: _isJumpCharging
+              border: Border.all(
+                color: _isJumpExecuting ? Colors.grey : Colors.purple,
+                width: 2,
+              ),
+              boxShadow: _isJumpCharging && !_isJumpExecuting
                   ? [
                       BoxShadow(
-                        color: Colors.purple.withAlpha((0.5 * 255).round()),
+                        color: Colors.purple.withAlpha(
+                          _isJumpCharged
+                              ? (_jumpChargedGlowOpacity * 255).round()
+                              : (0.5 * 255).round(),
+                        ),
                         blurRadius: 15,
+                        spreadRadius: _isJumpCharged ? 5 : 2,
+                      ),
+                    ]
+                  : _isJumpExecuting
+                  ? [
+                      BoxShadow(
+                        color: Colors.purple.withAlpha(
+                          (_jumpPulseEffect * 100).round(),
+                        ),
+                        blurRadius: 10,
                         spreadRadius: 2,
                       ),
                     ]
@@ -643,9 +1005,19 @@ class _ShipManualControlState extends State<ShipManualControl>
             ),
             child: Center(
               child: Text(
-                _isJumpCharging ? '跃迁充能中...' : '长按开始跃迁',
+                _isJumpExecuting
+                    ? '跃迁中...'
+                    : _isJumpCharged
+                    ? '跃迁准备就绪!'
+                    : _isJumpCharging
+                    ? '跃迁充能中...'
+                    : '长按开始跃迁',
                 style: TextStyle(
-                  color: _isJumpCharging ? Colors.white : Colors.purple,
+                  color: _isJumpExecuting
+                      ? Colors.white.withOpacity(0.7)
+                      : _isJumpCharging || _isJumpCharged
+                      ? Colors.white
+                      : Colors.purple,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -654,13 +1026,83 @@ class _ShipManualControlState extends State<ShipManualControl>
         ),
         const SizedBox(height: 8),
         Text(
-          _isJumpCharging ? '松开执行跃迁' : '',
+          _isJumpExecuting
+              ? '跃迁执行中，请稍候...'
+              : _isJumpCharged
+              ? ''
+              : _isJumpCharging
+              ? '充能完成将自动跃迁'
+              : '',
           style: TextStyle(
             fontSize: 12,
-            color: Colors.purple.withAlpha((0.8 * 255).round()),
+            color: _isJumpExecuting
+                ? Colors.purple
+                : _isJumpCharged
+                ? Colors.purple
+                : Colors.purple.withAlpha((0.8 * 255).round()),
+            fontWeight: _isJumpExecuting || _isJumpCharged
+                ? FontWeight.bold
+                : FontWeight.normal,
           ),
         ),
       ],
     );
+  }
+}
+
+// 跃迁粒子类
+class JumpParticle {
+  double x;
+  double y;
+  double vx;
+  double vy;
+  double size;
+  double alpha;
+  double alphaDecay; // 透明度衰减速率
+
+  JumpParticle({
+    required this.x,
+    required this.y,
+    required this.vx,
+    required this.vy,
+    required this.size,
+    required this.alpha,
+    required this.alphaDecay,
+  });
+
+  // 创建随机粒子
+  factory JumpParticle.random({
+    double alphaDecay = 0.01,
+    double speedMultiplier = 1.0,
+  }) {
+    final random = math.Random();
+    // 随机角度
+    final angle = random.nextDouble() * 2 * math.pi;
+    // 随机距离（从中心点)
+    final distance = 30 + random.nextDouble() * 30;
+    // 计算位置
+    final x = 60 + math.cos(angle) * distance;
+    final y = 60 + math.sin(angle) * distance;
+    // 速度
+    final speed = (0.2 + random.nextDouble() * 0.5) * speedMultiplier;
+    final vx = math.cos(angle) * speed;
+    final vy = math.sin(angle) * speed;
+
+    return JumpParticle(
+      x: x,
+      y: y,
+      vx: vx,
+      vy: vy,
+      size: 1 + random.nextDouble() * 3,
+      alpha: 0.3 + random.nextDouble() * 0.7,
+      alphaDecay: alphaDecay,
+    );
+  }
+
+  // 更新粒子状态
+  void update() {
+    x += vx;
+    y += vy;
+    alpha -= alphaDecay;
   }
 }
