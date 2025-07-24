@@ -200,10 +200,10 @@ class _SocketServerPageState extends State<SocketServerPage> {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: _messageLogs.length,
-            reverse: true, // 最新的消息显示在底部
+            // 不再需要reverse属性
             itemBuilder: (context, index) {
-              final log =
-                  _messageLogs[_messageLogs.length - 1 - index]; // 反转显示顺序
+              // 直接使用反向索引，最新的消息（列表末尾）显示在顶部
+              final log = _messageLogs[_messageLogs.length - 1 - index];
               return Card(
                 margin: const EdgeInsets.symmetric(vertical: 4),
                 color: log.isIncoming ? Colors.blue[50] : Colors.green[50],
