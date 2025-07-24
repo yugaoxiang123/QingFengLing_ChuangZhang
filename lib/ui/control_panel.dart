@@ -59,6 +59,17 @@ class _ControlPanelState extends State<ControlPanel> {
     _shipSpeed = _shipSpeed.clamp(340.0, 350.0);
   }
 
+  // 重置剧情状态
+  void _resetShipStatus() {
+    setState(() {
+      _shipStatus = "飞船起飞";
+      _shipCoordinates = {'x': 120.5, 'y': 45.8, 'z': 78.2};
+      _shipAngles = {'pitch': 15.2, 'yaw': 3.7, 'roll': 0.5};
+      _shipSpeed = 345.8;
+      _shipAttitude = "稳定";
+    });
+  }
+
   @override
   void dispose() {
     _timer.cancel();
@@ -109,7 +120,21 @@ class _ControlPanelState extends State<ControlPanel> {
           const SizedBox(height: 12),
 
           // 剧情状态
-          _buildInfoRow(context, '剧情状态', _shipStatus, Colors.blue),
+          _buildInfoRow(
+            context,
+            '剧情状态',
+            _shipStatus,
+            Colors.blue,
+            button: IconButton(
+              onPressed: _resetShipStatus,
+              icon: const Icon(Icons.refresh),
+              tooltip: '重置剧情',
+              style: IconButton.styleFrom(
+                backgroundColor: Colors.blue.withOpacity(0.1),
+                foregroundColor: Colors.blue,
+              ),
+            ),
+          ),
           const SizedBox(height: 8),
 
           // 飞船坐标
@@ -180,8 +205,9 @@ class _ControlPanelState extends State<ControlPanel> {
     BuildContext context,
     String label,
     String value,
-    Color color,
-  ) {
+    Color color, {
+    Widget? button,
+  }) {
     return Row(
       children: [
         SizedBox(
@@ -211,6 +237,8 @@ class _ControlPanelState extends State<ControlPanel> {
             ),
           ),
         ),
+        if (button != null) const SizedBox(width: 8),
+        if (button != null) button,
       ],
     );
   }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'ui/socket_server_page.dart';
 import 'ui/control_panel.dart';
 import 'services/socket_service.dart'; // 导入SocketService
+import 'ui/ship_manual_control.dart'; // 导入飞船手动控制组件
 
 void main() {
   // 确保Flutter框架初始化完成
@@ -54,11 +55,15 @@ class _HomePageState extends State<HomePage> {
         index: _selectedIndex,
         children: [
           // 飞船状态页面
-          Column(
-            children: [
-              // 顶部控制面板
-              const ControlPanel(),
-            ],
+          SingleChildScrollView(
+            child: Column(
+              children: [
+                // 顶部控制面板
+                const ControlPanel(),
+                // 飞船手动控制面板
+                const ShipManualControl(),
+              ],
+            ),
           ),
           // 服务器页面
           const SocketServerPage(),
