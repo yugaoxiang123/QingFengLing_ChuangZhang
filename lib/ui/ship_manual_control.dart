@@ -30,6 +30,11 @@ class _ShipManualControlState extends State<ShipManualControl>
   double _shipRotation = 0;
   double _shipScale = 1.0;
   double _engineGlowOpacity = 0.0;
+  // 添加飞船位移变量
+  double _shipYOffset = 0.0;
+  // 添加前进/减速发光效果
+  double _forwardGlowOpacity = 0.0;
+  double _backwardGlowOpacity = 0.0;
 
   @override
   void initState() {
@@ -49,6 +54,23 @@ class _ShipManualControlState extends State<ShipManualControl>
             1.0,
           );
           _shipScale = 1.0 + (_shipAnimController.value * 0.05);
+        }
+
+        // 当前进按下时，向上微移并增加前进发光效果
+        if (_forwardPressed) {
+          _shipYOffset = -5.0 * _shipAnimController.value;
+          _forwardGlowOpacity = (0.7 * _shipAnimController.value).clamp(
+            0.0,
+            0.7,
+          );
+        }
+        // 当减速按下时，向下微移并增加减速发光效果
+        else if (_backwardPressed) {
+          _shipYOffset = 5.0 * _shipAnimController.value;
+          _backwardGlowOpacity = (0.7 * _shipAnimController.value).clamp(
+            0.0,
+            0.7,
+          );
         }
 
         // 当左转或右转按下时，旋转飞船
@@ -98,6 +120,9 @@ class _ShipManualControlState extends State<ShipManualControl>
       setState(() {
         _engineGlowOpacity = 0.0;
         _shipScale = 1.0;
+        _shipYOffset = 0.0;
+        _forwardGlowOpacity = 0.0;
+        _backwardGlowOpacity = 0.0;
       });
     }
 
@@ -105,6 +130,19 @@ class _ShipManualControlState extends State<ShipManualControl>
     if (command == 'LEFT' || command == 'RIGHT') {
       setState(() {
         _shipRotation = 0;
+      });
+    }
+
+    // 如果是前进或减速结束，重置Y轴位移和发光效果
+    if (command == 'FORWARD') {
+      setState(() {
+        _shipYOffset = 0;
+        _forwardGlowOpacity = 0.0;
+      });
+    } else if (command == 'BACKWARD') {
+      setState(() {
+        _shipYOffset = 0;
+        _backwardGlowOpacity = 0.0;
       });
     }
   }
@@ -336,104 +374,161 @@ class _ShipManualControlState extends State<ShipManualControl>
         ],
       ),
       child: Center(
-        child: Transform.rotate(
-          angle: _shipRotation,
-          child: Transform.scale(
-            scale: _shipScale,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                // 飞船主体
-                Container(
-                  width: 60,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary,
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                ),
-                // 飞船机翼
-                Positioned(
-                  top: 40,
-                  child: Container(
-                    width: 100,
-                    height: 20,
+        child: Transform.translate(
+          offset: Offset(0, _shipYOffset),
+          child: Transform.rotate(
+            angle: _shipRotation,
+            child: Transform.scale(
+              scale: _shipScale,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // 飞船主体
+                  Container(
+                    width: 60,
+                    height: 80,
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.secondary,
-                      borderRadius: BorderRadius.circular(10),
+                      color: Theme.of(context).colorScheme.primary,
+                      borderRadius: BorderRadius.circular(30),
                     ),
                   ),
-                ),
-                // 飞船引擎
-                Positioned(
-                  bottom: 10,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      // 引擎发光效果
-                      if (_engineGlowOpacity > 0)
-                        Container(
-                          width: 40,
-                          height: 20,
-                          decoration: BoxDecoration(
-                            color: Colors.orange.withAlpha(
-                              (_engineGlowOpacity.clamp(0.0, 1.0) * 255)
-                                  .round(),
-                            ),
-                            borderRadius: BorderRadius.circular(10),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.orange.withAlpha(
-                                  ((_engineGlowOpacity * 0.8).clamp(0.0, 1.0) *
-                                          255)
-                                      .round(),
-                                ),
-                                blurRadius: 15,
-                                spreadRadius: 2,
+                  // 飞船机翼
+                  Positioned(
+                    top: 40,
+                    child: Container(
+                      width: 100,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.secondary,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  // 飞船引擎
+                  Positioned(
+                    bottom: 10,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        // 引擎发光效果
+                        if (_engineGlowOpacity > 0)
+                          Container(
+                            width: 40,
+                            height: 20,
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withAlpha(
+                                (_engineGlowOpacity.clamp(0.0, 1.0) * 255)
+                                    .round(),
                               ),
-                            ],
+                              borderRadius: BorderRadius.circular(10),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.orange.withAlpha(
+                                    ((_engineGlowOpacity * 0.8).clamp(
+                                              0.0,
+                                              1.0,
+                                            ) *
+                                            255)
+                                        .round(),
+                                  ),
+                                  blurRadius: 15,
+                                  spreadRadius: 2,
+                                ),
+                              ],
+                            ),
+                          ),
+                        // 引擎主体
+                        Container(
+                          width: 30,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            color: Colors.orange,
+                            borderRadius: BorderRadius.circular(5),
                           ),
                         ),
-                      // 引擎主体
-                      Container(
-                        width: 30,
-                        height: 10,
+                      ],
+                    ),
+                  ),
+
+                  // 前进发光效果
+                  if (_forwardGlowOpacity > 0)
+                    Positioned(
+                      top: -5,
+                      child: Container(
+                        width: 40,
+                        height: 20,
                         decoration: BoxDecoration(
-                          color: Colors.orange,
-                          borderRadius: BorderRadius.circular(5),
+                          color: Colors.blue.withAlpha(
+                            (_forwardGlowOpacity * 255).round(),
+                          ),
+                          borderRadius: BorderRadius.circular(10),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.blue.withAlpha(
+                                (_forwardGlowOpacity * 0.8 * 255).round(),
+                              ),
+                              blurRadius: 15,
+                              spreadRadius: 2,
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
-                ),
-                // 飞船窗口
-                Positioned(
-                  top: 20,
-                  child: Container(
-                    width: 30,
-                    height: 15,
-                    decoration: BoxDecoration(
-                      color: Colors.lightBlue.withAlpha((0.7 * 255).round()),
-                      borderRadius: BorderRadius.circular(7.5),
                     ),
-                  ),
-                ),
-                // 跃迁充能效果
-                if (_isJumpCharging)
-                  Container(
-                    width: 120,
-                    height: 120,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.purple.withAlpha(
-                          (_jumpChargeLevel.clamp(0.0, 1.0) * 255).round(),
+
+                  // 减速发光效果
+                  if (_backwardGlowOpacity > 0)
+                    Positioned(
+                      top: 70,
+                      child: Container(
+                        width: 40,
+                        height: 20,
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withAlpha(
+                            (_backwardGlowOpacity * 255).round(),
+                          ),
+                          borderRadius: BorderRadius.circular(10),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.orange.withAlpha(
+                                (_backwardGlowOpacity * 0.8 * 255).round(),
+                              ),
+                              blurRadius: 15,
+                              spreadRadius: 2,
+                            ),
+                          ],
                         ),
-                        width: 3,
+                      ),
+                    ),
+
+                  // 飞船窗口
+                  Positioned(
+                    top: 20,
+                    child: Container(
+                      width: 30,
+                      height: 15,
+                      decoration: BoxDecoration(
+                        color: Colors.lightBlue.withAlpha((0.7 * 255).round()),
+                        borderRadius: BorderRadius.circular(7.5),
                       ),
                     ),
                   ),
-              ],
+                  // 跃迁充能效果
+                  if (_isJumpCharging)
+                    Container(
+                      width: 120,
+                      height: 120,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.purple.withAlpha(
+                            (_jumpChargeLevel.clamp(0.0, 1.0) * 255).round(),
+                          ),
+                          width: 3,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ),
