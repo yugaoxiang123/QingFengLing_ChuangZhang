@@ -15,12 +15,14 @@ class _ControlPanelState extends State<ControlPanel> {
   late Timer _timer;
   final math.Random _random = math.Random();
 
+  // 剧情状态
+  String _storyStatus = "初始剧情";
+
   // 飞船状态数据
-  String _shipStatus = "飞船起飞";
   Map<String, double> _shipCoordinates = {'x': 120.5, 'y': 45.8, 'z': 78.2};
   Map<String, double> _shipAngles = {'pitch': 15.2, 'yaw': 3.7, 'roll': 0.5};
-  double _shipSpeed = 0.0;
-  String _shipAttitude = "稳定";
+  double _shipSpeed = 20.0; // 初始速度设置为20
+  String _shipAttitude = "巡航"; // 初始姿态为巡航
 
   // 控制状态
   bool _isForward = false;
@@ -36,7 +38,7 @@ class _ControlPanelState extends State<ControlPanel> {
   Timer? _jumpRecoveryTimer;
 
   // 目标速度和当前速度
-  double _targetSpeed = 0.0;
+  double _targetSpeed = 20.0; // 初始目标速度设置为20
   double _maxNormalSpeed = 370.0;
   double _maxThrustSpeed = 570.0;
   double _warpSpeed = 299792458.0; // 光速 m/s
@@ -92,27 +94,23 @@ class _ControlPanelState extends State<ControlPanel> {
         case 'FORWARD':
           _isForward = true;
           _updateTargetSpeed();
-          _shipAttitude = "加速前进";
           break;
         case 'BACKWARD':
           _isBackward = true;
           _updateTargetSpeed();
-          _shipAttitude = "减速";
           break;
         case 'LEFT':
           _isLeft = true;
-          _shipAttitude = "左转";
           break;
         case 'RIGHT':
           _isRight = true;
-          _shipAttitude = "右转";
           break;
         case 'THRUST':
           _isThrust = true;
           _updateTargetSpeed();
-          _shipAttitude = "全速推进";
           break;
       }
+      _updateShipAttitude();
     });
   }
 
@@ -123,57 +121,23 @@ class _ControlPanelState extends State<ControlPanel> {
         case 'FORWARD':
           _isForward = false;
           _updateTargetSpeed();
-          if (!_isBackward &&
-              !_isLeft &&
-              !_isRight &&
-              !_isThrust &&
-              !_isJumpExecuting) {
-            _shipAttitude = "巡航";
-          }
           break;
         case 'BACKWARD':
           _isBackward = false;
           _updateTargetSpeed();
-          if (!_isForward &&
-              !_isLeft &&
-              !_isRight &&
-              !_isThrust &&
-              !_isJumpExecuting) {
-            _shipAttitude = "巡航";
-          }
           break;
         case 'LEFT':
           _isLeft = false;
-          if (!_isForward &&
-              !_isBackward &&
-              !_isRight &&
-              !_isThrust &&
-              !_isJumpExecuting) {
-            _shipAttitude = "巡航";
-          }
           break;
         case 'RIGHT':
           _isRight = false;
-          if (!_isForward &&
-              !_isBackward &&
-              !_isLeft &&
-              !_isThrust &&
-              !_isJumpExecuting) {
-            _shipAttitude = "巡航";
-          }
           break;
         case 'THRUST':
           _isThrust = false;
           _updateTargetSpeed();
-          if (!_isForward &&
-              !_isBackward &&
-              !_isLeft &&
-              !_isRight &&
-              !_isJumpExecuting) {
-            _shipAttitude = "巡航";
-          }
           break;
       }
+      _updateShipAttitude();
     });
   }
 
@@ -182,7 +146,7 @@ class _ControlPanelState extends State<ControlPanel> {
     setState(() {
       _isJumpCharging = true;
       _jumpChargeLevel = 0.0;
-      _shipAttitude = "跃迁充能中";
+      _updateShipAttitude();
     });
   }
 
@@ -190,7 +154,7 @@ class _ControlPanelState extends State<ControlPanel> {
   void _handleJumpChargeComplete() {
     setState(() {
       _jumpChargeLevel = 1.0;
-      _shipAttitude = "跃迁准备就绪";
+      _updateShipAttitude();
     });
   }
 
@@ -199,8 +163,6 @@ class _ControlPanelState extends State<ControlPanel> {
     setState(() {
       _isJumpExecuting = true;
       _isJumpCharging = false;
-      _shipAttitude = "跃迁中";
-      _shipStatus = "跃迁航行";
 
       // 根据跃迁类型设置不同的速度
       if (command.contains('FULL')) {
@@ -210,6 +172,8 @@ class _ControlPanelState extends State<ControlPanel> {
       } else {
         _targetSpeed = _warpSpeed; // 低功率跃迁
       }
+
+      _updateShipAttitude();
     });
   }
 
@@ -218,24 +182,11 @@ class _ControlPanelState extends State<ControlPanel> {
     setState(() {
       _isJumpExecuting = false;
       _jumpChargeLevel = 0.0;
-      _shipStatus = "跃迁完成";
-      _shipAttitude = "减速";
-      _targetSpeed = 100.0; // 跃迁后初始速度
+      _targetSpeed = 0.0; // 跃迁后直接将速度设为0
+      _updateShipAttitude();
 
-      // 启动跃迁恢复计时器
+      // 不需要恢复计时器，因为已经设置为0速度
       _jumpRecoveryTimer?.cancel();
-      _jumpRecoveryTimer = Timer(const Duration(seconds: 5), () {
-        setState(() {
-          _shipStatus = "正常航行";
-          if (!_isForward &&
-              !_isBackward &&
-              !_isLeft &&
-              !_isRight &&
-              !_isThrust) {
-            _shipAttitude = "稳定";
-          }
-        });
-      });
     });
   }
 
@@ -244,9 +195,7 @@ class _ControlPanelState extends State<ControlPanel> {
     setState(() {
       _isJumpCharging = false;
       _jumpChargeLevel = 0.0;
-      if (!_isForward && !_isBackward && !_isLeft && !_isRight && !_isThrust) {
-        _shipAttitude = "稳定";
-      }
+      _updateShipAttitude();
     });
   }
 
@@ -261,7 +210,8 @@ class _ControlPanelState extends State<ControlPanel> {
     } else if (_isBackward) {
       _targetSpeed = 0.0; // 减速状态下的目标速度
     } else {
-      _targetSpeed = 0.0; // 默认目标速度
+      // 如果当前速度为0，保持目标速度为0，否则设为默认速度20
+      _targetSpeed = _shipSpeed <= 0.1 ? 0.0 : 20.0;
     }
   }
 
@@ -270,13 +220,41 @@ class _ControlPanelState extends State<ControlPanel> {
     // 更新速度 - 平滑过渡到目标速度
     if (_shipSpeed < _targetSpeed) {
       // 加速
-      double accelerationRate = _isJumpExecuting ? _warpSpeed / 20 : 5.0;
+      double accelerationRate;
+      if (_isJumpExecuting) {
+        accelerationRate = _warpSpeed / 20;
+      } else if (_isThrust) {
+        accelerationRate = 12.0; // 推进状态下加速更快
+      } else {
+        accelerationRate = 5.0; // 普通加速
+      }
       _shipSpeed = math.min(_targetSpeed, _shipSpeed + accelerationRate);
     } else if (_shipSpeed > _targetSpeed) {
       // 减速
-      double decelerationRate = _isJumpExecuting ? _warpSpeed / 30 : 2.0;
+      double decelerationRate;
+
+      // 从跃迁速度减速时使用更快的减速率
+      if (_shipSpeed > _maxNormalSpeed * 2) {
+        decelerationRate = _warpSpeed / 10; // 从光速快速减速
+      } else if (_isBackward) {
+        // 主动减速时，减速更快
+        decelerationRate = _isJumpExecuting ? _warpSpeed / 15 : 8.0;
+      } else {
+        // 自动减速时，减速较慢
+        decelerationRate = _isJumpExecuting ? _warpSpeed / 30 : 2.0;
+        // 如果不是主动减速且目标速度不是0，确保不会低于20
+        if (!_isBackward &&
+            _targetSpeed > 0 &&
+            _shipSpeed - decelerationRate < 20.0) {
+          _shipSpeed = 20.0;
+          return;
+        }
+      }
       _shipSpeed = math.max(_targetSpeed, _shipSpeed - decelerationRate);
     }
+
+    // 更新飞船姿态
+    _updateShipAttitude();
 
     // 更新角度
     if (_isLeft) {
@@ -331,23 +309,69 @@ class _ControlPanelState extends State<ControlPanel> {
     }
   }
 
+  // 统一更新飞船姿态
+  void _updateShipAttitude() {
+    // 优先级顺序：跃迁状态 > 操作状态 > 速度状态
+
+    // 跃迁相关状态
+    if (_isJumpExecuting) {
+      _shipAttitude = "跃迁中";
+      return;
+    }
+
+    if (_isJumpCharging) {
+      if (_jumpChargeLevel >= 1.0) {
+        _shipAttitude = "跃迁准备就绪";
+      } else {
+        _shipAttitude = "跃迁充能中";
+      }
+      return;
+    }
+
+    // 操作状态
+    if (_isThrust) {
+      _shipAttitude = "全速推进";
+      return;
+    }
+
+    if (_isForward) {
+      _shipAttitude = "加速前进";
+      return;
+    }
+
+    if (_isBackward) {
+      _shipAttitude = "减速";
+      return;
+    }
+
+    if (_isLeft) {
+      _shipAttitude = "左转";
+      return;
+    }
+
+    if (_isRight) {
+      _shipAttitude = "右转";
+      return;
+    }
+
+    // 速度状态
+    if (_shipSpeed < 0.1) {
+      _shipAttitude = "停止";
+    } else if (_shipSpeed < 50) {
+      _shipAttitude = "巡航";
+    } else if (_shipSpeed < _maxNormalSpeed) {
+      _shipAttitude = "高速巡航";
+    } else if (_shipSpeed < _maxThrustSpeed) {
+      _shipAttitude = "超速航行";
+    } else {
+      _shipAttitude = "极速航行";
+    }
+  }
+
   // 重置剧情状态
-  void _resetShipStatus() {
+  void _resetStoryStatus() {
     setState(() {
-      _shipStatus = "飞船起飞";
-      _shipCoordinates = {'x': 120.5, 'y': 45.8, 'z': 78.2};
-      _shipAngles = {'pitch': 15.2, 'yaw': 3.7, 'roll': 0.5};
-      _shipSpeed = 0.0;
-      _targetSpeed = 0.0;
-      _shipAttitude = "稳定";
-      _isForward = false;
-      _isBackward = false;
-      _isLeft = false;
-      _isRight = false;
-      _isThrust = false;
-      _isJumpCharging = false;
-      _isJumpExecuting = false;
-      _jumpChargeLevel = 0.0;
+      _storyStatus = "初始剧情";
     });
   }
 
@@ -416,10 +440,10 @@ class _ControlPanelState extends State<ControlPanel> {
           _buildInfoRow(
             context,
             '剧情状态',
-            _shipStatus,
+            _storyStatus,
             Colors.blue,
             button: IconButton(
-              onPressed: _resetShipStatus,
+              onPressed: _resetStoryStatus,
               icon: const Icon(Icons.refresh),
               tooltip: '重置剧情',
               style: IconButton.styleFrom(
