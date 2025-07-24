@@ -62,50 +62,23 @@ class _SocketServerPageState extends State<SocketServerPage> {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildServerStatusCard(),
-          const SizedBox(height: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 顶部显示客户端列表
-                Expanded(
-                  flex: 1,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '已连接客户端',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 8),
-                      Expanded(child: _buildClientsList()),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // 底部显示消息日志
-                Expanded(
-                  flex: 2,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '消息日志',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 8),
-                      Expanded(child: _buildMessageLogsList()),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildServerStatusCard(),
+            const SizedBox(height: 16),
+            // 已连接客户端部分
+            Text('已连接客户端', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            _buildClientsList(),
+            const SizedBox(height: 16),
+            // 消息日志部分
+            Text('消息日志', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            _buildMessageLogsList(),
+          ],
+        ),
       ),
     );
   }
@@ -151,8 +124,13 @@ class _SocketServerPageState extends State<SocketServerPage> {
   // 客户端列表
   Widget _buildClientsList() {
     return _connectedClients.isEmpty
-        ? const Center(child: Text('暂无连接的客户端'))
+        ? const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16.0),
+            child: Center(child: Text('暂无连接的客户端')),
+          )
         : ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
             itemCount: _connectedClients.length,
             itemBuilder: (context, index) {
               final client = _connectedClients[index];
@@ -214,8 +192,13 @@ class _SocketServerPageState extends State<SocketServerPage> {
   // 消息日志列表
   Widget _buildMessageLogsList() {
     return _messageLogs.isEmpty
-        ? const Center(child: Text('暂无消息记录'))
+        ? const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16.0),
+            child: Center(child: Text('暂无消息记录')),
+          )
         : ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
             itemCount: _messageLogs.length,
             reverse: true, // 最新的消息显示在底部
             itemBuilder: (context, index) {
