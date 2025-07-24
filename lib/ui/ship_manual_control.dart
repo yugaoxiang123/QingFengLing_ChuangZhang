@@ -57,7 +57,8 @@ class _ShipManualControlState extends State<ShipManualControl>
         } else if (_rightPressed) {
           _shipRotation = 0.2 * _shipAnimController.value;
         } else {
-          _shipRotation = _shipRotation * (1 - _shipAnimController.value);
+          // 当没有按下左转或右转时，立即重置旋转角度
+          _shipRotation = 0;
         }
       });
     });
@@ -97,6 +98,13 @@ class _ShipManualControlState extends State<ShipManualControl>
       setState(() {
         _engineGlowOpacity = 0.0;
         _shipScale = 1.0;
+      });
+    }
+
+    // 如果是左转或右转结束，立即重置旋转角度
+    if (command == 'LEFT' || command == 'RIGHT') {
+      setState(() {
+        _shipRotation = 0;
       });
     }
   }
@@ -449,6 +457,7 @@ class _ShipManualControlState extends State<ShipManualControl>
           onTapDown: (_) => onPressed(),
           onTapUp: (_) => onReleased(),
           onTapCancel: () => onReleased(),
+          onLongPress: null, // 移除长按事件，只使用按下和释放
           child: Container(
             width: size,
             height: size,
