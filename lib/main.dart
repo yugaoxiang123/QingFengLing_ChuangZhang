@@ -43,17 +43,15 @@ class _HomePageState extends State<HomePage> {
       body: IndexedStack(
         index: _selectedIndex,
         children: [
-          // 服务器页面，包含控制面板和SocketServerPage
+          // 飞船状态页面
           Column(
             children: [
               // 顶部控制面板
               const ControlPanel(),
-              // SocketServerPage
-              const Expanded(child: SocketServerPage()),
             ],
           ),
-          // 设置页面
-          const Center(child: Text('设置页面 - 开发中')),
+          // 服务器页面
+          const SocketServerPage(),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -64,8 +62,11 @@ class _HomePageState extends State<HomePage> {
           });
         },
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.router), label: '服务器'),
-          NavigationDestination(icon: Icon(Icons.settings), label: '设置'),
+          NavigationDestination(
+            icon: Icon(Icons.flight_takeoff),
+            label: '飞船操控',
+          ),
+          NavigationDestination(icon: Icon(Icons.router), label: 'Socket服务器'),
         ],
       ),
     );
