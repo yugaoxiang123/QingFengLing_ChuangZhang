@@ -63,7 +63,7 @@ class _SocketServerPageState extends State<SocketServerPage> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: const Text('清风岭操控面板'),
+        title: const Text('清峰岭控制面板'),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
