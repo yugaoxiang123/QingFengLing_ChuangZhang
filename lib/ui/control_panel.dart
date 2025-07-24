@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import '../services/event_bus.dart';
+import '../services/socket_service.dart'; // 添加socket服务导入
 
 class ControlPanel extends StatefulWidget {
   const ControlPanel({super.key});
@@ -16,7 +17,20 @@ class _ControlPanelState extends State<ControlPanel> {
   final math.Random _random = math.Random();
 
   // 剧情状态
-  String _storyStatus = "初始剧情";
+  int _storyStatus = 0; // 默认为0无
+
+  // 剧情状态常量
+  static const Map<int, String> storyStatusMap = {
+    0: "无",
+    1: "登船准备",
+    2: "飞船起飞",
+    3: "雷电防护",
+    4: "捕捉垃圾",
+    5: "击碎陨石",
+    6: "行星科普",
+    7: "加速飞行",
+    8: "抵达月球",
+  };
 
   // 飞船状态数据
   Map<String, double> _shipCoordinates = {'x': 120.5, 'y': 45.8, 'z': 78.2};
@@ -43,6 +57,11 @@ class _ControlPanelState extends State<ControlPanel> {
   double _maxThrustSpeed = 570.0;
   double _warpSpeed = 299792458.0; // 光速 m/s
 
+  // Socket消息订阅
+  StreamSubscription? _socketMessageSubscription;
+  // Socket服务状态订阅
+  StreamSubscription? _socketStatusSubscription;
+
   @override
   void initState() {
     super.initState();
@@ -57,6 +76,37 @@ class _ControlPanelState extends State<ControlPanel> {
 
     // 监听控制事件
     _listenToControlEvents();
+
+    // 监听Socket消息
+    _listenToSocketMessages();
+
+    // 监听Socket服务状态变化
+    _listenToSocketServiceStatus();
+
+    // 初始化时广播一次剧情状态
+    Future.delayed(const Duration(seconds: 1), () {
+      _broadcastStoryStatus();
+    });
+  }
+
+  // 监听Socket消息
+  void _listenToSocketMessages() {
+    _socketMessageSubscription = socketService.listenToMessageType(
+      'STORY_STATUS',
+      (content) {
+        try {
+          // 解析剧情状态值
+          final statusValue = int.parse(content.trim());
+          if (storyStatusMap.containsKey(statusValue)) {
+            setState(() {
+              _storyStatus = statusValue;
+            });
+          }
+        } catch (e) {
+          print('解析剧情状态消息失败: $e');
+        }
+      },
+    );
   }
 
   // 监听控制事件
@@ -490,10 +540,39 @@ class _ControlPanelState extends State<ControlPanel> {
     }
   }
 
+  // 更新剧情状态
+  void _updateStoryStatus(int newStatus) {
+    if (_storyStatus == newStatus) return; // 如果状态没变，不处理
+
+    setState(() {
+      _storyStatus = newStatus;
+    });
+
+    // 通过Socket广播剧情状态变化
+    _broadcastStoryStatus();
+  }
+
+  // 广播剧情状态
+  void _broadcastStoryStatus() {
+    if (socketService.isServerRunning) {
+      socketService.broadcastMessage('STORY_STATUS:$_storyStatus');
+    }
+  }
+
   // 重置剧情状态
   void _resetStoryStatus() {
-    setState(() {
-      _storyStatus = "初始剧情";
+    _updateStoryStatus(0); // 重置为"无"
+  }
+
+  // 监听Socket服务状态变化
+  void _listenToSocketServiceStatus() {
+    _socketStatusSubscription = socketService.runningStream.listen((isRunning) {
+      if (isRunning) {
+        // Socket服务启动时，广播当前剧情状态
+        Future.delayed(const Duration(milliseconds: 500), () {
+          _broadcastStoryStatus();
+        });
+      }
     });
   }
 
@@ -501,6 +580,8 @@ class _ControlPanelState extends State<ControlPanel> {
   void dispose() {
     _timer.cancel();
     _jumpRecoveryTimer?.cancel();
+    _socketMessageSubscription?.cancel();
+    _socketStatusSubscription?.cancel();
     super.dispose();
   }
 
@@ -562,16 +643,23 @@ class _ControlPanelState extends State<ControlPanel> {
           _buildInfoRow(
             context,
             '剧情状态',
-            _storyStatus,
+            storyStatusMap[_storyStatus] ?? "未知",
             Colors.blue,
-            button: IconButton(
-              onPressed: _resetStoryStatus,
-              icon: const Icon(Icons.refresh),
-              tooltip: '重置剧情',
-              style: IconButton.styleFrom(
-                backgroundColor: Colors.blue.withOpacity(0.1),
-                foregroundColor: Colors.blue,
-              ),
+            button: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  onPressed: _resetStoryStatus,
+                  icon: const Icon(Icons.refresh),
+                  tooltip: '重置剧情',
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.blue.withOpacity(0.1),
+                    foregroundColor: Colors.blue,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _buildStorySelector(context),
+              ],
             ),
           ),
           const SizedBox(height: 8),
@@ -636,6 +724,20 @@ class _ControlPanelState extends State<ControlPanel> {
           context,
         ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
       ),
+    );
+  }
+
+  // 构建剧情选择器
+  Widget _buildStorySelector(BuildContext context) {
+    return PopupMenuButton<int>(
+      tooltip: '选择剧情状态',
+      icon: const Icon(Icons.movie_outlined),
+      itemBuilder: (context) {
+        return storyStatusMap.entries.map((entry) {
+          return PopupMenuItem<int>(value: entry.key, child: Text(entry.value));
+        }).toList();
+      },
+      onSelected: _updateStoryStatus,
     );
   }
 

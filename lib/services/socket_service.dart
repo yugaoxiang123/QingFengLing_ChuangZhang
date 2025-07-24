@@ -70,6 +70,12 @@ class SocketService {
   final _messageLogController = StreamController<List<MessageLog>>.broadcast();
   Stream<List<MessageLog>> get messageLogStream => _messageLogController.stream;
 
+  // 特定消息类型监听
+  final _specificMessageController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  Stream<Map<String, dynamic>> get specificMessageStream =>
+      _specificMessageController.stream;
+
   // 状态变化通知
   final _statusController = StreamController<String>.broadcast();
   Stream<String> get statusStream => _statusController.stream;
@@ -134,6 +140,7 @@ class SocketService {
     _clientsController.close();
     _runningController.close();
     _messageLogController.close();
+    _specificMessageController.close();
   }
 
   // 启动Socket服务器和WebSocket服务器
@@ -278,7 +285,8 @@ class SocketService {
           isIncoming: true,
         );
 
-        // 这里可以添加处理接收数据的逻辑
+        // 处理特定消息类型
+        _processSpecificMessage(message);
       },
       onError: (error) {
         print("Socket连接错误 $clientAddress: $error");
@@ -321,7 +329,8 @@ class SocketService {
           isIncoming: true,
         );
 
-        // 这里可以添加处理WebSocket消息的逻辑
+        // 处理特定消息类型
+        _processSpecificMessage(message);
       },
       onError: (error) {
         print("WebSocket连接错误 $clientAddress: $error");
@@ -497,5 +506,41 @@ class SocketService {
     } catch (e) {
       print("广播消息失败: $e");
     }
+  }
+
+  // 处理特定类型的消息
+  void _processSpecificMessage(String message) {
+    try {
+      // 处理特定格式的消息
+      if (message.contains(':')) {
+        final parts = message.split(':');
+        if (parts.length >= 2) {
+          final messageType = parts[0].trim();
+          final messageContent = parts.sublist(1).join(':').trim();
+
+          // 发送到特定消息流
+          _specificMessageController.add({
+            'type': messageType,
+            'content': messageContent,
+            'raw': message,
+            'timestamp': DateTime.now(),
+          });
+        }
+      }
+    } catch (e) {
+      print("处理特定消息失败: $e");
+    }
+  }
+
+  // 监听特定类型的消息
+  StreamSubscription listenToMessageType(
+    String messageType,
+    Function(String content) callback,
+  ) {
+    return specificMessageStream.listen((messageData) {
+      if (messageData['type'] == messageType) {
+        callback(messageData['content']);
+      }
+    });
   }
 }
