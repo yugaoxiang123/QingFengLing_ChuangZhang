@@ -173,6 +173,14 @@ class _ControlPanelState extends State<ControlPanel> {
         _targetSpeed = _warpSpeed; // 低功率跃迁
       }
 
+      // 开始跃迁时立即重置坐标到跃迁起点范围内
+      // 这样可以防止之前累积的大坐标值影响跃迁过程
+      _shipCoordinates = {
+        'x': 100.0 + _random.nextDouble() * 20.0,
+        'y': 40.0 + _random.nextDouble() * 10.0,
+        'z': 70.0 + _random.nextDouble() * 15.0,
+      };
+
       _updateShipAttitude();
     });
   }
@@ -183,6 +191,15 @@ class _ControlPanelState extends State<ControlPanel> {
       _isJumpExecuting = false;
       _jumpChargeLevel = 0.0;
       _targetSpeed = 0.0; // 跃迁后直接将速度设为0
+
+      // 跃迁完成后重置坐标到一个新的合理范围
+      // 模拟跃迁到了一个新的区域
+      _shipCoordinates = {
+        'x': 100.0 + _random.nextDouble() * 50.0,
+        'y': 40.0 + _random.nextDouble() * 20.0,
+        'z': 70.0 + _random.nextDouble() * 30.0,
+      };
+
       _updateShipAttitude();
 
       // 不需要恢复计时器，因为已经设置为0速度
@@ -256,56 +273,150 @@ class _ControlPanelState extends State<ControlPanel> {
     // 更新飞船姿态
     _updateShipAttitude();
 
-    // 更新角度
+    // 更新角度 - 无论速度如何，都根据用户操作更新角度
+    // 偏航角(yaw)变化 - 左右转向
     if (_isLeft) {
-      _shipAngles['yaw'] = _shipAngles['yaw']! - 0.3;
-      _shipAngles['roll'] = _shipAngles['roll']! - 0.1;
+      // 左转时，偏航角减小，滚转角向左倾斜
+      double turnRate = _isThrust ? 0.5 : 0.3; // 推进时转向更快
+      _shipAngles['yaw'] = _shipAngles['yaw']! - turnRate;
+      _shipAngles['roll'] = math.max(
+        -15.0,
+        _shipAngles['roll']! - 0.3,
+      ); // 限制最大倾斜角度
     } else if (_isRight) {
-      _shipAngles['yaw'] = _shipAngles['yaw']! + 0.3;
-      _shipAngles['roll'] = _shipAngles['roll']! + 0.1;
+      // 右转时，偏航角增加，滚转角向右倾斜
+      double turnRate = _isThrust ? 0.5 : 0.3; // 推进时转向更快
+      _shipAngles['yaw'] = _shipAngles['yaw']! + turnRate;
+      _shipAngles['roll'] = math.min(
+        15.0,
+        _shipAngles['roll']! + 0.3,
+      ); // 限制最大倾斜角度
     } else {
-      // 逐渐恢复到平衡状态
+      // 没有转向输入时，滚转角逐渐恢复到平衡状态
       _shipAngles['roll'] = _shipAngles['roll']! * 0.95;
     }
 
-    // 根据前进/后退更新俯仰角
+    // 俯仰角(pitch)变化 - 前进/后退
     if (_isForward) {
-      _shipAngles['pitch'] = math.max(10.0, _shipAngles['pitch']! - 0.2);
+      // 前进时，俯仰角降低（机头向下）
+      double pitchRate = _isThrust ? 0.3 : 0.2; // 推进时俯仰变化更快
+      _shipAngles['pitch'] = math.max(
+        5.0,
+        _shipAngles['pitch']! - pitchRate,
+      ); // 限制最小俯仰角
     } else if (_isBackward) {
-      _shipAngles['pitch'] = math.min(25.0, _shipAngles['pitch']! + 0.2);
+      // 后退时，俯仰角增加（机头向上）
+      double pitchRate = 0.2;
+      _shipAngles['pitch'] = math.min(
+        30.0,
+        _shipAngles['pitch']! + pitchRate,
+      ); // 限制最大俯仰角
     } else {
-      // 逐渐恢复到平衡状态
-      if (_shipAngles['pitch']! > 15.2) {
+      // 没有前进/后退输入时，俯仰角逐渐恢复到平衡状态
+      double defaultPitch = 15.2; // 默认平衡俯仰角
+      if (_shipAngles['pitch']! > defaultPitch + 0.1) {
         _shipAngles['pitch'] = _shipAngles['pitch']! - 0.1;
-      } else if (_shipAngles['pitch']! < 15.2) {
+      } else if (_shipAngles['pitch']! < defaultPitch - 0.1) {
         _shipAngles['pitch'] = _shipAngles['pitch']! + 0.1;
+      } else {
+        _shipAngles['pitch'] = defaultPitch; // 直接设置为默认值，避免微小抖动
       }
     }
 
-    // 添加一些随机小变化，让数据看起来更真实
-    if (!_isJumpExecuting) {
-      _shipCoordinates['x'] =
-          _shipCoordinates['x']! + (_random.nextDouble() * 2 - 1) * 0.3;
-      _shipCoordinates['y'] =
-          _shipCoordinates['y']! + (_random.nextDouble() * 2 - 1) * 0.2;
-      _shipCoordinates['z'] =
-          _shipCoordinates['z']! + (_random.nextDouble() * 2 - 1) * 0.25;
+    // 只有在速度不为0时才更新坐标
+    if (_shipSpeed > 0.1) {
+      if (!_isJumpExecuting) {
+        // 根据当前速度和角度计算坐标变化
+        // 将偏航角转换为弧度
+        double yawRadians = _shipAngles['yaw']! * (math.pi / 180.0);
+        // 将俯仰角转换为弧度
+        double pitchRadians = _shipAngles['pitch']! * (math.pi / 180.0);
 
-      // 小幅度随机调整角度
-      _shipAngles['pitch'] =
-          _shipAngles['pitch']! + (_random.nextDouble() * 2 - 1) * 0.05;
-      _shipAngles['yaw'] =
-          _shipAngles['yaw']! + (_random.nextDouble() * 2 - 1) * 0.05;
-      _shipAngles['roll'] =
-          _shipAngles['roll']! + (_random.nextDouble() * 2 - 1) * 0.02;
-    } else {
-      // 跃迁过程中坐标变化更剧烈
-      _shipCoordinates['x'] =
-          _shipCoordinates['x']! + (_random.nextDouble() * 2 - 1) * 2.0;
-      _shipCoordinates['y'] =
-          _shipCoordinates['y']! + (_random.nextDouble() * 2 - 1) * 2.0;
-      _shipCoordinates['z'] =
-          _shipCoordinates['z']! + (_random.nextDouble() * 2 - 1) * 2.0;
+        // 计算速度分量
+        double speedFactor = _shipSpeed * 0.01; // 缩放因子，使坐标变化更合理
+
+        // 根据偏航角和俯仰角计算三维方向向量
+        double dx = speedFactor * math.sin(yawRadians) * math.cos(pitchRadians);
+        double dy = speedFactor * math.sin(pitchRadians);
+        double dz = speedFactor * math.cos(yawRadians) * math.cos(pitchRadians);
+
+        // 更新坐标
+        _shipCoordinates['x'] = _shipCoordinates['x']! + dx;
+        _shipCoordinates['y'] = _shipCoordinates['y']! + dy;
+        _shipCoordinates['z'] = _shipCoordinates['z']! + dz;
+
+        // 添加小幅度随机调整，增加真实感
+        _shipCoordinates['x'] =
+            _shipCoordinates['x']! + (_random.nextDouble() * 2 - 1) * 0.05;
+        _shipCoordinates['y'] =
+            _shipCoordinates['y']! + (_random.nextDouble() * 2 - 1) * 0.05;
+        _shipCoordinates['z'] =
+            _shipCoordinates['z']! + (_random.nextDouble() * 2 - 1) * 0.05;
+
+        // 小幅度随机调整角度，增加真实感
+        _shipAngles['pitch'] =
+            _shipAngles['pitch']! + (_random.nextDouble() * 2 - 1) * 0.03;
+        _shipAngles['yaw'] =
+            _shipAngles['yaw']! + (_random.nextDouble() * 2 - 1) * 0.03;
+        _shipAngles['roll'] =
+            _shipAngles['roll']! + (_random.nextDouble() * 2 - 1) * 0.01;
+
+        // 即使在正常飞行中也确保坐标不会超出合理范围
+        _constrainCoordinates();
+      } else {
+        // 跃迁过程中的坐标变化 - 使用完全不同的计算方式
+        // 不再基于实际速度，而是模拟一个跃迁隧道中的小范围振荡
+
+        // 在跃迁隧道中的振荡效果
+        _shipCoordinates['x'] =
+            100.0 +
+            math.sin(_currentTime.millisecondsSinceEpoch * 0.001) * 10.0;
+        _shipCoordinates['y'] =
+            40.0 + math.cos(_currentTime.millisecondsSinceEpoch * 0.0015) * 5.0;
+        _shipCoordinates['z'] =
+            70.0 + math.sin(_currentTime.millisecondsSinceEpoch * 0.0012) * 8.0;
+
+        // 添加一点随机性
+        _shipCoordinates['x'] =
+            _shipCoordinates['x']! + (_random.nextDouble() * 2 - 1) * 0.5;
+        _shipCoordinates['y'] =
+            _shipCoordinates['y']! + (_random.nextDouble() * 2 - 1) * 0.3;
+        _shipCoordinates['z'] =
+            _shipCoordinates['z']! + (_random.nextDouble() * 2 - 1) * 0.4;
+      }
+    }
+    // 当速度为0时，坐标不变化
+  }
+
+  // 限制坐标在合理范围内
+  void _constrainCoordinates() {
+    // 定义坐标的合理范围
+    const double minX = 50.0;
+    const double maxX = 200.0;
+    const double minY = 30.0;
+    const double maxY = 70.0;
+    const double minZ = 40.0;
+    const double maxZ = 150.0;
+
+    // 限制X坐标
+    if (_shipCoordinates['x']! < minX) {
+      _shipCoordinates['x'] = minX;
+    } else if (_shipCoordinates['x']! > maxX) {
+      _shipCoordinates['x'] = maxX;
+    }
+
+    // 限制Y坐标
+    if (_shipCoordinates['y']! < minY) {
+      _shipCoordinates['y'] = minY;
+    } else if (_shipCoordinates['y']! > maxY) {
+      _shipCoordinates['y'] = maxY;
+    }
+
+    // 限制Z坐标
+    if (_shipCoordinates['z']! < minZ) {
+      _shipCoordinates['z'] = minZ;
+    } else if (_shipCoordinates['z']! > maxZ) {
+      _shipCoordinates['z'] = maxZ;
     }
   }
 
@@ -467,7 +578,7 @@ class _ControlPanelState extends State<ControlPanel> {
           _buildInfoRow(
             context,
             '飞船角度',
-            '俯仰: ${_shipAngles['pitch']!.toStringAsFixed(1)}°, 偏航: ${_shipAngles['yaw']!.toStringAsFixed(1)}°, 翻滚: ${_shipAngles['roll']!.toStringAsFixed(1)}°',
+            '俯仰: ${_shipAngles['pitch']!.toStringAsFixed(1)}°, 偏航: ${_shipAngles['yaw']!.toStringAsFixed(1)}°',
             Colors.orange,
           ),
           const SizedBox(height: 8),
