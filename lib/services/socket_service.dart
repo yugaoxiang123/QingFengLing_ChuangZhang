@@ -452,4 +452,50 @@ class SocketService {
       print("发送测试消息失败: $e");
     }
   }
+
+  // 广播消息到所有连接的客户端
+  void broadcastMessage(String message) {
+    if (!isServerRunning || (sockets.isEmpty && webSockets.isEmpty)) {
+      print("没有连接的客户端，广播消息失败");
+      return;
+    }
+
+    try {
+      // 广播到所有Socket客户端
+      for (var socket in sockets) {
+        final clientAddress =
+            "${socket.remoteAddress.address}:${socket.remotePort}";
+        socket.add(message.codeUnits);
+
+        // 添加消息日志
+        _addMessageLog(
+          clientAddress: "Socket客户端: $clientAddress",
+          message: message,
+          isIncoming: false,
+        );
+      }
+
+      // 广播到所有WebSocket客户端
+      for (var webSocket in webSockets) {
+        final clientIndex = clientConnections.indexWhere(
+          (conn) => conn.connection == webSocket,
+        );
+        if (clientIndex >= 0) {
+          final clientAddress = clientConnections[clientIndex].clientAddress;
+          webSocket.add(message);
+
+          // 添加消息日志
+          _addMessageLog(
+            clientAddress: "WebSocket客户端: $clientAddress",
+            message: message,
+            isIncoming: false,
+          );
+        }
+      }
+
+      print("消息已广播到 ${sockets.length + webSockets.length} 个客户端");
+    } catch (e) {
+      print("广播消息失败: $e");
+    }
+  }
 }

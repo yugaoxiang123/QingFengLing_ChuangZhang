@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../services/socket_service.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
+import '../services/event_bus.dart'; // 导入事件总线
+import '../services/socket_service.dart'; // 导入Socket服务
 
 class ShipManualControl extends StatefulWidget {
   const ShipManualControl({super.key});
@@ -203,11 +204,18 @@ class _ShipManualControlState extends State<ShipManualControl>
     }
   }
 
-  // 发送控制命令到服务器
+  // 发送控制命令
   void _sendCommand(String command) {
-    // 遍历所有连接的客户端
-    for (var client in socketService.clientConnections) {
-      socketService.sendTestMessage(client.connection, command);
+    // 发送Socket广播消息，告知其他设备当前控制命令
+    socketService.broadcastMessage(command);
+    // 使用事件总线发送命令
+    if (command.startsWith('START_')) {
+      shipControlEventBus.emitCommand(command.substring(6), isStart: true);
+    } else if (command.startsWith('END_')) {
+      shipControlEventBus.emitCommand(command.substring(4), isStart: false);
+    } else {
+      // 处理其他命令类型（跃迁相关）
+      shipControlEventBus.emitJumpCommand(command);
     }
   }
 
