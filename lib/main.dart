@@ -23,7 +23,7 @@ class MyApp extends StatelessWidget {
     });
 
     return MaterialApp(
-      title: '清峰岭控制面板',
+      title: '青峰岭控制面板',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
@@ -49,7 +49,7 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: const Text('清峰岭控制面板'),
+        title: const Text('青峰岭控制面板'),
       ),
       body: IndexedStack(
         index: _selectedIndex,
