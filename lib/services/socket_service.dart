@@ -148,16 +148,35 @@ class SocketService {
     if (isServerRunning) return;
 
     try {
+      print("开始启动Socket服务...");
       await _getLocalIpAddress();
+      print("获取到本地IP地址: $serverIp");
 
-      // 启动原生Socket服务器
-      server = await ServerSocket.bind(InternetAddress.anyIPv4, serverPort);
+      try {
+        // 启动原生Socket服务器
+        print("尝试绑定Socket服务器到端口: $serverPort");
+        server = await ServerSocket.bind(InternetAddress.anyIPv4, serverPort);
+        print("Socket服务器绑定成功");
+      } catch (e) {
+        print("Socket服务器绑定失败: $e");
+        throw e;
+      }
 
-      // 启动WebSocket服务器
-      httpServer = await HttpServer.bind(
-        InternetAddress.anyIPv4,
-        webSocketPort,
-      );
+      try {
+        // 启动WebSocket服务器
+        print("尝试绑定WebSocket服务器到端口: $webSocketPort");
+        httpServer = await HttpServer.bind(
+          InternetAddress.anyIPv4,
+          webSocketPort,
+        );
+        print("WebSocket服务器绑定成功");
+      } catch (e) {
+        print("WebSocket服务器绑定失败: $e");
+        // 如果Socket服务器已启动但WebSocket启动失败，需要关闭Socket服务器
+        server?.close();
+        server = null;
+        throw e;
+      }
 
       isServerRunning = true;
       statusMessage =
@@ -223,6 +242,7 @@ class SocketService {
         },
       );
     } catch (e) {
+      print("启动服务失败，详细错误: $e");
       statusMessage = "启动服务失败: $e";
       _notifyStatusChange();
       stopServer();
@@ -371,21 +391,51 @@ class SocketService {
   // 获取本地IP地址
   Future<void> _getLocalIpAddress() async {
     try {
+      print("开始获取本地IP地址...");
       final interfaces = await NetworkInterface.list(
         type: InternetAddressType.IPv4,
-        includeLinkLocal: false,
       );
 
+      print("找到网络接口数量: ${interfaces.length}");
+      // 打印所有网络接口信息，用于调试
+      for (var interface in interfaces) {
+        print("接口名称: ${interface.name}, 地址数量: ${interface.addresses.length}");
+        for (var addr in interface.addresses) {
+          print(
+            "  - ${addr.address} (${addr.isLoopback ? '回环' : '非回环'}, ${addr.isLinkLocal ? '本地链接' : '非本地链接'})",
+          );
+        }
+      }
+
+      // 首先尝试找到非回环、非本地链接的地址
       for (var interface in interfaces) {
         for (var addr in interface.addresses) {
-          if (!addr.isLinkLocal && !addr.isLoopback) {
+          if (!addr.isLoopback && !addr.isLinkLocal) {
+            print("选择非回环、非本地链接地址: ${addr.address}");
             serverIp = addr.address;
             return;
           }
         }
       }
+
+      // 如果没有找到理想的地址，尝试找到任何非回环地址
+      for (var interface in interfaces) {
+        for (var addr in interface.addresses) {
+          if (!addr.isLoopback) {
+            print("选择非回环地址: ${addr.address}");
+            serverIp = addr.address;
+            return;
+          }
+        }
+      }
+
+      // 如果还是没有找到，使用回环地址
+      print("未找到合适的IP地址，使用回环地址: 127.0.0.1");
+      serverIp = "127.0.0.1";
     } catch (e) {
       print("获取IP地址失败: $e");
+      // 发生错误时使用回环地址
+      serverIp = "127.0.0.1";
     }
   }
 

@@ -118,17 +118,47 @@ class _SocketServerPageState extends State<SocketServerPage> {
               ],
             ),
             const SizedBox(height: 8),
-            Text(_statusMessage),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _isServerRunning
-                  ? _socketService.stopServer
-                  : _socketService.startServer,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _isServerRunning ? Colors.red : Colors.green,
-                foregroundColor: Colors.white,
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(8.0),
+              decoration: BoxDecoration(
+                color: Colors.grey[200],
+                borderRadius: BorderRadius.circular(4.0),
               ),
-              child: Text(_isServerRunning ? '停止服务' : '启动服务'),
+              child: Text(
+                _statusMessage,
+                style: TextStyle(
+                  color:
+                      _statusMessage.contains('失败') ||
+                          _statusMessage.contains('错误')
+                      ? Colors.red
+                      : Colors.black,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                ElevatedButton(
+                  onPressed: _isServerRunning
+                      ? _socketService.stopServer
+                      : _socketService.startServer,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _isServerRunning
+                        ? Colors.red
+                        : Colors.green,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: Text(_isServerRunning ? '停止服务' : '启动服务'),
+                ),
+                // 添加一个刷新按钮
+                IconButton(
+                  onPressed: _updateInitialState,
+                  icon: const Icon(Icons.refresh),
+                  tooltip: '刷新状态',
+                ),
+              ],
             ),
           ],
         ),
