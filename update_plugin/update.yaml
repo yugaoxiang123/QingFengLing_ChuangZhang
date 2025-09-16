@@ -1,0 +1,28 @@
+# 软件更新配置文件
+# 此文件用于配置软件自动更新功能
+
+# 最新版本信息
+latest_version:
+  version: "0.1.6"
+  version_code: 106
+  build_date: "2025-09-15"
+  
+  # 更新类型
+  # 0: 普通更新（用户可选择）
+  # 1: 强制更新（必须更新）
+  # 2: 静默更新（后台自动更新）
+  update_type: 0
+  
+  # 更新说明
+  description: |
+    版本 0.1.4 更新内容：
+    - 增加了软件自动更新功能
+    
+  # 下载链接
+  download_url: "https://shv-software.oss-cn-zhangjiakou.aliyuncs.com/Android-Packages/qfl-publitity/94e5df62b0224768899900fbe7b6e68e.apk"
+  
+  # 文件信息
+  file_info:
+    size: 58929917  # 文件大小（字节）
+    md5: "94e5df62b0224768899900fbe7b6e68e"  # MD5校验值
+    sha256: "18be3e2eeb1ff84f5b23d7cb87849ba6339ca5a5d8728544148b6fccb217099f"  # SHA256校验值

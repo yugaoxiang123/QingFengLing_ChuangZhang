@@ -1,13 +1,36 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- 添加网络权限 -->
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+
+    <!-- 自动更新功能所需权限 -->
+    <!-- 网络访问权限 - 用于检查更新和下载APK文件 -->
+    <uses-permission android:name="android.permission.INTERNET" />
+  
+    <!-- 网络状态权限 - 用于检查网络连接状态 -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+  
+    <!-- 外部存储写入权限 - 用于下载和保存APK文件 -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" 
+                     android:maxSdkVersion="28" />
+  
+    <!-- 安装未知来源应用权限 - 用于安装下载的APK文件 -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+  
+    <!-- 存储权限 - Android 13+ 需要 -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+  
+    <!-- 传统存储权限兼容 -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" 
+                     android:maxSdkVersion="32" />
     
     <application
         android:label="qf_controller"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true"
+        android:requestLegacyExternalStorage="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"

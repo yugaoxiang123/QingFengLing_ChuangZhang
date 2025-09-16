@@ -4,6 +4,8 @@ import 'ui/control_panel.dart';
 import 'services/socket_service.dart'; // 导入SocketService
 import 'ui/ship_manual_control.dart'; // 导入飞船手动控制组件
 
+import 'plugins/auto_update/auto_update.dart';
+
 void main() {
   // 确保Flutter框架初始化完成
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,7 +31,10 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
       debugShowCheckedModeBanner: false,
-      home: const HomePage(),
+      home: UpdateManager(
+        enabled: true,
+        child: const HomePage(),
+      ),
     );
   }
 }
