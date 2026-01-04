@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -294,8 +295,8 @@ class SocketService {
     // 监听客户端消息
     socket.listen(
       (Uint8List data) {
-        // 处理接收到的数据
-        final message = String.fromCharCodes(data);
+        // 处理接收到的数据（使用UTF-8解码）
+        final message = utf8.decode(data);
         print("收到来自Socket客户端 $clientAddress 的消息: $message");
 
         // 添加消息日志
@@ -481,7 +482,7 @@ class SocketService {
         final socket = connection as Socket;
         final clientAddress =
             "${socket.remoteAddress.address}:${socket.remotePort}";
-        socket.add(message.codeUnits);
+        socket.add(utf8.encode(message));
 
         // 添加消息日志
         _addMessageLog(
@@ -524,7 +525,7 @@ class SocketService {
       for (var socket in sockets) {
         final clientAddress =
             "${socket.remoteAddress.address}:${socket.remotePort}";
-        socket.add(message.codeUnits);
+        socket.add(utf8.encode(message));
 
         // 添加消息日志
         _addMessageLog(
