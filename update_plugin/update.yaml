@@ -3,9 +3,9 @@
 
 # 最新版本信息
 latest_version:
-  version: "0.1.5"
-  version_code: 105
-  build_date: "2026-01-04"
+  version: "0.1.9"
+  version_code: 109
+  build_date: "2026-01-05"
   
   # 更新类型
   # 0: 普通更新（用户可选择）
@@ -15,14 +15,14 @@ latest_version:
   
   # 更新说明
   description: |
-    版本 0.1.5 更新内容：
+    版本 0.1.9 更新内容：
     - 修复控制面板消息发送问题
     
   # 下载链接
-  download_url: "https://shv-software.oss-cn-zhangjiakou.aliyuncs.com/Android-Packages/qfl-ship-controller/9272eff6207a1b0119eeaa89c2f65fe9.apk"
+  download_url: "https://shv-software.oss-cn-zhangjiakou.aliyuncs.com/Android-Packages/qfl-ship-controller/aaaa4313919ef10d19d3dc6d63ff5837.apk"
   
   # 文件信息
   file_info:
-    size: 22880882  # 文件大小（字节）
-    md5: "9272eff6207a1b0119eeaa89c2f65fe9"  # MD5校验值
-    sha256: "9b781b149c5e4284330d1ff0cf045707f1f6d94d68a0ed9a4f398a555ce4a641"  # SHA256校验值
+    size: 22880880  # 文件大小（字节）
+    md5: "aaaa4313919ef10d19d3dc6d63ff5837"  # MD5校验值
+    sha256: "c6d21402ccdecc5270f7a6608b2bce62169d99c35afa18802454ddfcb7df4654"  # SHA256校验值
