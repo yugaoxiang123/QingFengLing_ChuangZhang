@@ -298,9 +298,28 @@ class SocketService {
 
   // 处理Socket新连接
   void _handleConnection(Socket socket) {
-    sockets.add(socket);
+    final clientIp = socket.remoteAddress.address;
     final clientAddress =
         "${socket.remoteAddress.address}:${socket.remotePort}";
+
+    // 按IP地址去重：如果已存在相同IP的连接，先移除旧连接
+    final existingConnections = clientConnections.where((conn) {
+      if (conn.clientType == "Socket" && conn.connection is Socket) {
+        final existingSocket = conn.connection as Socket;
+        return existingSocket.remoteAddress.address == clientIp;
+      }
+      return false;
+    }).toList();
+
+    // 移除相同IP的旧连接
+    for (var oldConn in existingConnections) {
+      final oldSocket = oldConn.connection as Socket;
+      final oldAddress = "${oldSocket.remoteAddress.address}:${oldSocket.remotePort}";
+      print("检测到相同IP的新连接，移除旧连接: $oldAddress");
+      _removeSocketClient(oldSocket, oldAddress);
+    }
+
+    sockets.add(socket);
 
     // 注意：TCP Keepalive通过ping机制实现
     // Dart的Socket API不直接支持设置keepalive选项
