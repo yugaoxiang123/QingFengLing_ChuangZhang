@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>飞船手动控制消息机制说明文档</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', 'PingFang SC', 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .section {
+            margin-bottom: 40px;
+        }
+
+        .section h2 {
+            color: #667eea;
+            font-size: 1.8em;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+        }
+
+        .section h3 {
+            color: #764ba2;
+            font-size: 1.4em;
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+
+        .message-card {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .message-card h4 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 1.2em;
+        }
+
+        .message-code {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 1em;
+            margin: 10px 0;
+            overflow-x: auto;
+        }
+
+        .key-badge {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 5px;
+            font-weight: bold;
+            margin: 0 5px;
+            font-family: monospace;
+        }
+
+        .operation-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .operation-table th {
+            background: #667eea;
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: bold;
+        }
+
+        .operation-table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .operation-table tr:hover {
+            background: #f5f5f5;
+        }
+
+        .operation-table tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+
+        .operation-table tr:nth-child(even):hover {
+            background: #f0f0f0;
+        }
+
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+
+        .warning-box {
+            background: #fff3e0;
+            border-left: 4px solid #ff9800;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+
+        .success-box {
+            background: #e8f5e9;
+            border-left: 4px solid #4caf50;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+
+        ul, ol {
+            margin-left: 30px;
+            margin-top: 10px;
+        }
+
+        li {
+            margin: 8px 0;
+        }
+
+        .flow-diagram {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+
+        .flow-step {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #667eea;
+            border-radius: 5px;
+        }
+
+        .flow-step::before {
+            content: "→ ";
+            color: #667eea;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+
+        footer {
+            background: #2d2d2d;
+            color: white;
+            text-align: center;
+            padding: 20px;
+            font-size: 0.9em;
+        }
+
+        .message-type {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 0.85em;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .message-type.start {
+            background: #4caf50;
+            color: white;
+        }
+
+        .message-type.end {
+            background: #f44336;
+            color: white;
+        }
+
+        .message-type.jump {
+            background: #9c27b0;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚀 飞船手动控制消息机制说明文档</h1>
+            <p>详细说明飞船手动控制系统的消息发送机制和消息内容</p>
+        </header>
+
+        <div class="content">
+            <!-- 概述部分 -->
+            <section class="section">
+                <h2>📋 概述</h2>
+                <p>飞船手动控制系统通过Socket服务向所有连接的客户端广播控制命令。系统支持两种通信方式：原生Socket连接（端口8888）和WebSocket连接（端口8889）。</p>
+                
+                <div class="info-box">
+                    <strong>消息发送机制：</strong>
+                    <ul>
+                        <li>所有控制命令通过 <code>socketService.broadcastMessage(command)</code> 方法广播</li>
+                        <li>消息同时发送到所有连接的Socket客户端和WebSocket客户端</li>
+                        <li>消息格式为纯文本字符串，使用UTF-8编码</li>
+                        <li>系统每30秒自动发送Ping消息（<code>__PING__</code>）检测连接状态</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- 基本控制命令 -->
+            <section class="section">
+                <h2>🎮 基本控制命令</h2>
+                <p>基本控制命令包括前进、后退、左转、右转和推进。每个命令在按下时发送开始消息，释放时发送结束消息。</p>
+
+                <h3>1. 前进控制 (FORWARD)</h3>
+                <div class="message-card">
+                    <h4>操作方式</h4>
+                    <p>按下 <span class="key-badge">W</span> 键或点击"前进"按钮</p>
+                    
+                    <h4>发送的消息</h4>
+                    <div class="message-code">START_FORWARD</div>
+                    <span class="message-type start">开始命令</span>
+                </div>
+                <div class="message-card">
+                    <h4>操作方式</h4>
+                    <p>释放 <span class="key-badge">W</span> 键或释放"前进"按钮</p>
+                    
+                    <h4>发送的消息</h4>
+                    <div class="message-code">END_FORWARD</div>
+                    <span class="message-type end">结束命令</span>
+                </div>
+
+                <h3>2. 后退/减速控制 (BACKWARD)</h3>
+                <div class="message-card">
+                    <h4>操作方式</h4>
+                    <p>按下 <span class="key-badge">S</span> 键或点击"减速"按钮</p>
+                    
+                    <h4>发送的消息</h4>
+                    <div class="message-code">START_BACKWARD</div>
+                    <span class="message-type start">开始命令</span>
+                </div>
+                <div class="message-card">
+                    <h4>操作方式</h4>
+                    <p>释放 <span class="key-badge">S</span> 键或释放"减速"按钮</p>
+                    
+                    <h4>发送的消息</h4>
+                    <div class="message-code">END_BACKWARD</div>
+                    <span class="message-type end">结束命令</span>
+                </div>
+
+                <h3>3. 左转控制 (LEFT)</h3>
+                <div class="message-card">
+                    <h4>操作方式</h4>
+                    <p>按下 <span class="key-badge">A</span> 键或点击"左转"按钮</p>
+                    
+                    <h4>发送的消息</h4>
+                    <div class="message-code">START_LEFT</div>
+                    <span class="message-type start">开始命令</span>
+                </div>
+                <div class="message-card">
+                    <h4>操作方式</h4>
+                    <p>释放 <span class="key-badge">A</span> 键或释放"左转"按钮</p>
+                    
+                    <h4>发送的消息</h4>
+                    <div class="message-code">END_LEFT</div>
+                    <span class="message-type end">结束命令</span>
+                </div>
+
+                <h3>4. 右转控制 (RIGHT)</h3>
+                <div class="message-card">
+                    <h4>操作方式</h4>
+                    <p>按下 <span class="key-badge">D</span> 键或点击"右转"按钮</p>
+                    
+                    <h4>发送的消息</h4>
+                    <div class="message-code">START_RIGHT</div>
+                    <span class="message-type start">开始命令</span>
+                </div>
+                <div class="message-card">
+                    <h4>操作方式</h4>
+                    <p>释放 <span class="key-badge">D</span> 键或释放"右转"按钮</p>
+                    
+                    <h4>发送的消息</h4>
+                    <div class="message-code">END_RIGHT</div>
+                    <span class="message-type end">结束命令</span>
+                </div>
+
+                <h3>5. 推进控制 (THRUST)</h3>
+                <div class="message-card">
+                    <h4>操作方式</h4>
+                    <p>按下 <span class="key-badge">空格</span> 键或点击"推进"按钮</p>
+                    
+                    <h4>发送的消息</h4>
+                    <div class="message-code">START_THRUST</div>
+                    <span class="message-type start">开始命令</span>
+                </div>
+                <div class="message-card">
+                    <h4>操作方式</h4>
+                    <p>释放 <span class="key-badge">空格</span> 键或释放"推进"按钮</p>
+                    
+                    <h4>发送的消息</h4>
+                    <div class="message-code">END_THRUST</div>
+                    <span class="message-type end">结束命令</span>
+                </div>
+            </section>
+
+            <!-- 跃迁控制命令 -->
+            <section class="section">
+                <h2>⚡ 跃迁控制命令</h2>
+                <p>跃迁系统是一个多阶段的过程，包括充能、执行和完成三个阶段。跃迁充能需要一定时间，充能完成后会自动执行跃迁。</p>
+
+                <div class="flow-diagram">
+                    <h3>跃迁流程</h3>
+                    <div class="flow-step">按下回车键或长按跃迁按钮 → 开始充能</div>
+                    <div class="flow-step">充能过程中（约2.5秒）→ 充能进度更新</div>
+                    <div class="flow-step">充能达到100% → 充能完成</div>
+                    <div class="flow-step">自动执行跃迁（约6秒）→ 根据充能程度发送不同命令</div>
+                    <div class="flow-step">跃迁执行完成 → 发送完成消息</div>
+                </div>
+
+                <h3>1. 开始跃迁充能</h3>
+                <div class="message-card">
+                    <h4>操作方式</h4>
+                    <p>按下 <span class="key-badge">回车</span> 键或长按"跃迁"按钮</p>
+                    <p><strong>条件：</strong>当前未在充能、未充能完成且未在执行跃迁</p>
+                    
+                    <h4>发送的消息</h4>
+                    <div class="message-code">START_JUMP_CHARGE</div>
+                    <span class="message-type jump">跃迁命令</span>
+                    
+                    <h4>说明</h4>
+                    <ul>
+                        <li>开始跃迁充能过程</li>
+                        <li>充能时间约2.5秒（每50毫秒增加4%充能值）</li>
+                        <li>充能过程中可以取消</li>
+                    </ul>
+                </div>
+
+                <h3>2. 跃迁充能完成</h3>
+                <div class="message-card">
+                    <h4>触发条件</h4>
+                    <p>充能值达到100%（自动触发）</p>
+                    
+                    <h4>发送的消息</h4>
+                    <div class="message-code">JUMP_CHARGE_COMPLETE</div>
+                    <span class="message-type jump">跃迁命令</span>
+                    
+                    <h4>说明</h4>
+                    <ul>
+                        <li>充能完成后会自动开始执行跃迁</li>
+                        <li>此时会显示充能完成提示和粒子效果</li>
+                        <li>无法取消，必须等待跃迁执行完成</li>
+                    </ul>
+                </div>
+
+                <h3>3. 执行跃迁</h3>
+                <div class="message-card">
+                    <h4>触发条件</h4>
+                    <p>充能完成后自动执行（约6秒动画过程）</p>
+                    
+                    <h4>发送的消息（根据充能程度）</h4>
+                    <div class="message-code">EXECUTE_JUMP_FULL</div>
+                    <span class="message-type jump">跃迁命令</span>
+                    <p><strong>条件：</strong>充能程度 ≥ 95%</p>
+                    
+                    <div class="message-code">EXECUTE_JUMP_MEDIUM</div>
+                    <span class="message-type jump">跃迁命令</span>
+                    <p><strong>条件：</strong>充能程度 ≥ 50% 且 < 95%</p>
+                    
+                    <div class="message-code">EXECUTE_JUMP_SHORT</div>
+                    <span class="message-type jump">跃迁命令</span>
+                    <p><strong>条件：</strong>充能程度 < 50%</p>
+                    
+                    <div class="warning-box">
+                        <strong>注意：</strong>正常情况下充能会达到100%，所以通常会发送 <code>EXECUTE_JUMP_FULL</code> 消息。
+                    </div>
+                </div>
+
+                <h3>4. 跃迁完成</h3>
+                <div class="message-card">
+                    <h4>触发条件</h4>
+                    <p>跃迁执行动画完成（约6秒后）</p>
+                    
+                    <h4>发送的消息</h4>
+                    <div class="message-code">JUMP_COMPLETE</div>
+                    <span class="message-type jump">跃迁命令</span>
+                    
+                    <h4>说明</h4>
+                    <ul>
+                        <li>跃迁过程完全结束</li>
+                        <li>所有跃迁相关状态重置</li>
+                        <li>可以开始下一次跃迁</li>
+                    </ul>
+                </div>
+
+                <h3>5. 取消跃迁</h3>
+                <div class="message-card">
+                    <h4>操作方式</h4>
+                    <p>在充能过程中按下 <span class="key-badge">回车</span> 键或点击跃迁按钮</p>
+                    <p><strong>条件：</strong>正在充能且未开始执行跃迁</p>
+                    
+                    <h4>发送的消息</h4>
+                    <div class="message-code">CANCEL_JUMP</div>
+                    <span class="message-type jump">跃迁命令</span>
+                    
+                    <div class="warning-box">
+                        <strong>重要：</strong>一旦开始执行跃迁（充能完成），就无法取消，必须等待跃迁完成。
+                    </div>
+                </div>
+            </section>
+
+            <!-- 消息发送机制 -->
+            <section class="section">
+                <h2>🔧 消息发送机制详解</h2>
+                
+                <h3>消息发送流程</h3>
+                <div class="flow-diagram">
+                    <div class="flow-step">用户操作（按键/点击）</div>
+                    <div class="flow-step">调用 <code>_sendCommand(command)</code> 方法</div>
+                    <div class="flow-step">通过 <code>socketService.broadcastMessage(command)</code> 广播消息</div>
+                    <div class="flow-step">消息发送到所有Socket客户端（端口8888）</div>
+                    <div class="flow-step">消息发送到所有WebSocket客户端（端口8889）</div>
+                    <div class="flow-step">同时通过事件总线发送到本地组件</div>
+                </div>
+
+                <h3>消息格式</h3>
+                <div class="info-box">
+                    <ul>
+                        <li><strong>编码：</strong>UTF-8</li>
+                        <li><strong>格式：</strong>纯文本字符串</li>
+                        <li><strong>大小写：</strong>全部大写</li>
+                        <li><strong>分隔符：</strong>使用下划线（_）分隔单词</li>
+                    </ul>
+                </div>
+
+                <h3>消息分类</h3>
+                <table class="operation-table">
+                    <thead>
+                        <tr>
+                            <th>消息类型</th>
+                            <th>前缀</th>
+                            <th>示例</th>
+                            <th>说明</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>开始命令</td>
+                            <td><code>START_</code></td>
+                            <td><code>START_FORWARD</code></td>
+                            <td>控制动作开始</td>
+                        </tr>
+                        <tr>
+                            <td>结束命令</td>
+                            <td><code>END_</code></td>
+                            <td><code>END_FORWARD</code></td>
+                            <td>控制动作结束</td>
+                        </tr>
+                        <tr>
+                            <td>跃迁命令</td>
+                            <td>无固定前缀</td>
+                            <td><code>START_JUMP_CHARGE</code><br><code>JUMP_CHARGE_COMPLETE</code><br><code>EXECUTE_JUMP_FULL</code></td>
+                            <td>跃迁相关操作</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <!-- 操作对照表 -->
+            <section class="section">
+                <h2>📊 操作与消息对照表</h2>
+                <table class="operation-table">
+                    <thead>
+                        <tr>
+                            <th>操作</th>
+                            <th>键盘按键</th>
+                            <th>按钮</th>
+                            <th>发送的消息</th>
+                            <th>触发时机</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>前进</td>
+                            <td><span class="key-badge">W</span></td>
+                            <td>前进按钮</td>
+                            <td><code>START_FORWARD</code></td>
+                            <td>按下时</td>
+                        </tr>
+                        <tr>
+                            <td>停止前进</td>
+                            <td><span class="key-badge">W</span></td>
+                            <td>前进按钮</td>
+                            <td><code>END_FORWARD</code></td>
+                            <td>释放时</td>
+                        </tr>
+                        <tr>
+                            <td>后退/减速</td>
+                            <td><span class="key-badge">S</span></td>
+                            <td>减速按钮</td>
+                            <td><code>START_BACKWARD</code></td>
+                            <td>按下时</td>
+                        </tr>
+                        <tr>
+                            <td>停止后退</td>
+                            <td><span class="key-badge">S</span></td>
+                            <td>减速按钮</td>
+                            <td><code>END_BACKWARD</code></td>
+                            <td>释放时</td>
+                        </tr>
+                        <tr>
+                            <td>左转</td>
+                            <td><span class="key-badge">A</span></td>
+                            <td>左转按钮</td>
+                            <td><code>START_LEFT</code></td>
+                            <td>按下时</td>
+                        </tr>
+                        <tr>
+                            <td>停止左转</td>
+                            <td><span class="key-badge">A</span></td>
+                            <td>左转按钮</td>
+                            <td><code>END_LEFT</code></td>
+                            <td>释放时</td>
+                        </tr>
+                        <tr>
+                            <td>右转</td>
+                            <td><span class="key-badge">D</span></td>
+                            <td>右转按钮</td>
+                            <td><code>START_RIGHT</code></td>
+                            <td>按下时</td>
+                        </tr>
+                        <tr>
+                            <td>停止右转</td>
+                            <td><span class="key-badge">D</span></td>
+                            <td>右转按钮</td>
+                            <td><code>END_RIGHT</code></td>
+                            <td>释放时</td>
+                        </tr>
+                        <tr>
+                            <td>推进</td>
+                            <td><span class="key-badge">空格</span></td>
+                            <td>推进按钮</td>
+                            <td><code>START_THRUST</code></td>
+                            <td>按下时</td>
+                        </tr>
+                        <tr>
+                            <td>停止推进</td>
+                            <td><span class="key-badge">空格</span></td>
+                            <td>推进按钮</td>
+                            <td><code>END_THRUST</code></td>
+                            <td>释放时</td>
+                        </tr>
+                        <tr>
+                            <td>开始跃迁充能</td>
+                            <td><span class="key-badge">回车</span></td>
+                            <td>长按跃迁按钮</td>
+                            <td><code>START_JUMP_CHARGE</code></td>
+                            <td>按下时（未充能状态）</td>
+                        </tr>
+                        <tr>
+                            <td>取消跃迁</td>
+                            <td><span class="key-badge">回车</span></td>
+                            <td>点击跃迁按钮</td>
+                            <td><code>CANCEL_JUMP</code></td>
+                            <td>按下时（充能中）</td>
+                        </tr>
+                        <tr>
+                            <td>跃迁充能完成</td>
+                            <td>-</td>
+                            <td>-</td>
+                            <td><code>JUMP_CHARGE_COMPLETE</code></td>
+                            <td>充能达到100%（自动）</td>
+                        </tr>
+                        <tr>
+                            <td>执行跃迁（满充能）</td>
+                            <td>-</td>
+                            <td>-</td>
+                            <td><code>EXECUTE_JUMP_FULL</code></td>
+                            <td>充能完成（≥95%）</td>
+                        </tr>
+                        <tr>
+                            <td>执行跃迁（中等充能）</td>
+                            <td>-</td>
+                            <td>-</td>
+                            <td><code>EXECUTE_JUMP_MEDIUM</code></td>
+                            <td>充能完成（50%-95%）</td>
+                        </tr>
+                        <tr>
+                            <td>执行跃迁（低充能）</td>
+                            <td>-</td>
+                            <td>-</td>
+                            <td><code>EXECUTE_JUMP_SHORT</code></td>
+                            <td>充能完成（<50%）</td>
+                        </tr>
+                        <tr>
+                            <td>跃迁完成</td>
+                            <td>-</td>
+                            <td>-</td>
+                            <td><code>JUMP_COMPLETE</code></td>
+                            <td>跃迁动画完成（约6秒后）</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <!-- 技术细节 -->
+            <section class="section">
+                <h2>⚙️ 技术实现细节</h2>
+                
+                <h3>Socket服务配置</h3>
+                <div class="info-box">
+                    <ul>
+                        <li><strong>原生Socket端口：</strong>8888</li>
+                        <li><strong>WebSocket端口：</strong>8889</li>
+                        <li><strong>WebSocket路径：</strong>/ws</li>
+                        <li><strong>绑定地址：</strong>0.0.0.0（所有网络接口）</li>
+                        <li><strong>Ping间隔：</strong>30秒</li>
+                        <li><strong>Ping消息：</strong><code>__PING__</code>（不记录日志）</li>
+                    </ul>
+                </div>
+
+                <h3>消息处理逻辑</h3>
+                <div class="message-card">
+                    <h4>消息发送方法</h4>
+                    <div class="message-code">void _sendCommand(String command) {
+    // 1. 通过Socket服务广播消息
+    socketService.broadcastMessage(command);
+    
+    // 2. 通过事件总线发送到本地组件
+    if (command.startsWith('START_')) {
+        shipControlEventBus.emitCommand(
+            command.substring(6), 
+            isStart: true
+        );
+    } else if (command.startsWith('END_')) {
+        shipControlEventBus.emitCommand(
+            command.substring(4), 
+            isStart: false
+        );
+    } else {
+        // 跃迁相关命令
+        shipControlEventBus.emitJumpCommand(command);
+    }
+}</div>
+                </div>
+
+                <h3>消息广播机制</h3>
+                <div class="message-card">
+                    <h4>广播方法</h4>
+                    <div class="message-code">void broadcastMessage(String message) {
+    // 1. 广播到所有Socket客户端
+    for (var socket in sockets) {
+        socket.add(utf8.encode(message));
+    }
+    
+    // 2. 广播到所有WebSocket客户端
+    for (var webSocket in webSockets) {
+        webSocket.add(message);
+    }
+}</div>
+                </div>
+
+                <div class="success-box">
+                    <strong>优势：</strong>
+                    <ul>
+                        <li>支持多客户端同时连接</li>
+                        <li>实时同步所有客户端的控制状态</li>
+                        <li>自动检测和清理断开的连接</li>
+                        <li>支持Socket和WebSocket两种协议</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- 注意事项 -->
+            <section class="section">
+                <h2>⚠️ 注意事项</h2>
+                
+                <div class="warning-box">
+                    <h3>消息发送时机</h3>
+                    <ul>
+                        <li>基本控制命令（前进、后退、左转、右转、推进）在按键按下和释放时分别发送开始和结束消息</li>
+                        <li>跃迁充能开始需要用户主动触发，但充能完成和执行是自动的</li>
+                        <li>一旦跃迁开始执行，无法取消，必须等待完成</li>
+                    </ul>
+                </div>
+
+                <div class="warning-box">
+                    <h3>消息接收处理</h3>
+                    <ul>
+                        <li>客户端应该正确处理所有消息类型，包括未知消息</li>
+                        <li>建议实现消息队列机制，避免消息丢失</li>
+                        <li>注意处理网络延迟和消息乱序的情况</li>
+                        <li>Ping消息（<code>__PING__</code>）应该被忽略，不进行业务处理</li>
+                    </ul>
+                </div>
+
+                <div class="info-box">
+                    <h3>最佳实践</h3>
+                    <ul>
+                        <li>客户端应该维护当前控制状态，根据START和END消息更新状态</li>
+                        <li>对于跃迁命令，应该按照流程顺序处理，避免状态混乱</li>
+                        <li>建议实现消息确认机制，确保重要消息被正确接收</li>
+                        <li>定期检查连接状态，及时重连断开的连接</li>
+                    </ul>
+                </div>
+            </section>
+        </div>
+
+        <footer>
+            <p>飞船手动控制系统消息机制说明文档 | 版本 1.0 | 最后更新：2024年</p>
+        </footer>
+    </div>
+</body>
+</html>
