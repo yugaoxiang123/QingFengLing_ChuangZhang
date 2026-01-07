@@ -90,6 +90,11 @@ class SocketService {
   final _runningController = StreamController<bool>.broadcast();
   Stream<bool> get runningStream => _runningController.stream;
 
+  // Ping定时器
+  Timer? _pingTimer;
+  static const String _pingMessage = "__PING__";
+  static const Duration _pingInterval = Duration(seconds: 30);
+
   // 单例模式
   static final SocketService _instance = SocketService._internal();
 
@@ -184,6 +189,9 @@ class SocketService {
           "服务已启动：\nSocket：$serverIp:$serverPort\nWebSocket：$serverIp:$webSocketPort";
       _notifyStatusChange();
 
+      // 启动Ping定时器
+      _startPingTimer();
+
       // 处理Socket连接
       server!.listen(
         (socket) {
@@ -252,16 +260,28 @@ class SocketService {
 
   // 停止Socket服务器
   void stopServer() {
+    // 停止Ping定时器
+    _pingTimer?.cancel();
+    _pingTimer = null;
+
     // 关闭所有Socket连接
     for (var socket in sockets) {
-      socket.destroy();
+      try {
+        socket.destroy();
+      } catch (e) {
+        print("关闭Socket连接时出错: $e");
+      }
     }
     server?.close();
     server = null;
 
     // 关闭所有WebSocket连接
     for (var ws in webSockets) {
-      ws.close();
+      try {
+        ws.close();
+      } catch (e) {
+        print("关闭WebSocket连接时出错: $e");
+      }
     }
     httpServer?.close(force: true);
     httpServer = null;
@@ -282,6 +302,10 @@ class SocketService {
     final clientAddress =
         "${socket.remoteAddress.address}:${socket.remotePort}";
 
+    // 注意：TCP Keepalive通过ping机制实现
+    // Dart的Socket API不直接支持设置keepalive选项
+    // 但我们的ping机制（每30秒发送一次ping）可以检测连接状态
+
     clientConnections.add(
       ClientConnection(
         clientAddress: clientAddress,
@@ -297,6 +321,12 @@ class SocketService {
       (Uint8List data) {
         // 处理接收到的数据（使用UTF-8解码）
         final message = utf8.decode(data);
+        
+        // 忽略ping消息，不记录日志
+        if (message == _pingMessage) {
+          return;
+        }
+        
         print("收到来自Socket客户端 $clientAddress 的消息: $message");
 
         // 添加消息日志
@@ -341,6 +371,12 @@ class SocketService {
       (dynamic data) {
         // WebSocket数据可能是String或Uint8List
         final message = data is String ? data : String.fromCharCodes(data);
+        
+        // 忽略ping消息，不记录日志
+        if (message == _pingMessage) {
+          return;
+        }
+        
         print("收到来自WebSocket客户端 $clientAddress 的消息: $message");
 
         // 添加消息日志
@@ -366,27 +402,31 @@ class SocketService {
 
   // 移除断开连接的Socket客户端
   void _removeSocketClient(Socket socket, String clientAddress) {
-    socket.destroy();
+    try {
+      socket.destroy();
+    } catch (e) {
+      print("销毁Socket连接时出错 $clientAddress: $e");
+    }
     sockets.remove(socket);
 
     clientConnections.removeWhere((conn) => conn.connection == socket);
     _notifyClientsChange();
+    print("已从连接列表移除Socket客户端: $clientAddress");
   }
 
   // 移除断开连接的WebSocket客户端
   void _removeWebSocketClient(WebSocket webSocket, String clientAddress) {
-    webSocket.close();
+    try {
+      webSocket.close();
+    } catch (e) {
+      print("关闭WebSocket连接时出错 $clientAddress: $e");
+    }
     webSockets.remove(webSocket);
 
     // 使用WebSocket对象引用来移除客户端连接
     clientConnections.removeWhere((conn) => conn.connection == webSocket);
     _notifyClientsChange();
-  }
-
-  // 更新客户端移除后的状态
-  void _updateStatusAfterClientRemoved() {
-    // 不更新状态信息，保持显示IP和端口
-    _notifyClientsChange();
+    print("已从连接列表移除WebSocket客户端: $clientAddress");
   }
 
   // 获取本地IP地址
@@ -479,10 +519,9 @@ class SocketService {
     try {
       if (connection is Socket) {
         // 发送到Socket客户端
-        final socket = connection as Socket;
         final clientAddress =
-            "${socket.remoteAddress.address}:${socket.remotePort}";
-        socket.add(utf8.encode(message));
+            "${connection.remoteAddress.address}:${connection.remotePort}";
+        connection.add(utf8.encode(message));
 
         // 添加消息日志
         _addMessageLog(
@@ -492,13 +531,12 @@ class SocketService {
         );
       } else if (connection is WebSocket) {
         // 发送到WebSocket客户端
-        final webSocket = connection as WebSocket;
         final clientIndex = clientConnections.indexWhere(
-          (conn) => conn.connection == webSocket,
+          (conn) => conn.connection == connection,
         );
         if (clientIndex >= 0) {
           final clientAddress = clientConnections[clientIndex].clientAddress;
-          webSocket.add(message);
+          connection.add(message);
 
           // 添加消息日志
           _addMessageLog(
@@ -593,5 +631,55 @@ class SocketService {
         callback(messageData['content']);
       }
     });
+  }
+
+  // 启动Ping定时器
+  void _startPingTimer() {
+    _pingTimer?.cancel();
+    _pingTimer = Timer.periodic(_pingInterval, (timer) {
+      if (isServerRunning) {
+        _pingAllClients();
+      } else {
+        timer.cancel();
+      }
+    });
+    print("Ping定时器已启动，间隔: ${_pingInterval.inSeconds}秒");
+  }
+
+  // Ping所有客户端，检测连接状态
+  void _pingAllClients() {
+    if (!isServerRunning || clientConnections.isEmpty) {
+      return;
+    }
+
+    // 创建连接列表的副本，避免在遍历时修改列表
+    final clientsToCheck = List<ClientConnection>.from(clientConnections);
+
+    for (var client in clientsToCheck) {
+      try {
+        if (client.connection is Socket) {
+          final socket = client.connection as Socket;
+          // 尝试发送ping消息
+          socket.add(utf8.encode(_pingMessage));
+          // 如果发送成功，连接正常，不做任何操作
+        } else if (client.connection is WebSocket) {
+          final webSocket = client.connection as WebSocket;
+          // 尝试发送ping消息
+          webSocket.add(_pingMessage);
+          // 如果发送成功，连接正常，不做任何操作
+        }
+      } catch (e) {
+        // 发送失败，说明连接已断开，移除客户端
+        print("Ping客户端失败 ${client.clientAddress}: $e，移除连接");
+        if (client.connection is Socket) {
+          _removeSocketClient(client.connection as Socket, client.clientAddress);
+        } else if (client.connection is WebSocket) {
+          _removeWebSocketClient(
+            client.connection as WebSocket,
+            client.clientAddress,
+          );
+        }
+      }
+    }
   }
 }
