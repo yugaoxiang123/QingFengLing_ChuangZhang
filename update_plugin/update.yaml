@@ -3,9 +3,9 @@
 
 # 最新版本信息
 latest_version:
-  version: "0.1.10"
-  version_code: 110
-  build_date: "2026-01-07"
+  version: "0.1.11"
+  version_code: 111
+  build_date: "2026-01-14"
   
   # 更新类型
   # 0: 普通更新（用户可选择）
@@ -15,14 +15,14 @@ latest_version:
   
   # 更新说明
   description: |
-    版本 0.1.10 更新内容：
-    - 修复一个客户端连接多个的问题
+    版本 0.1.11 更新内容：
+    - 允许船长控制飞船剧情
     
   # 下载链接
-  download_url: "https://shv-software.oss-cn-zhangjiakou.aliyuncs.com/Android-Packages/qfl-ship-controller/08b1352dee489cdde0c0c7fb31313762.apk"
+  download_url: "https://shv-software.oss-cn-zhangjiakou.aliyuncs.com/Android-Packages/qfl-ship-controller/2ab8cc6cc78e9c93016d54ec2cf744f9.apk"
   
   # 文件信息
   file_info:
-    size: 22893710  # 文件大小（字节）
-    md5: "08b1352dee489cdde0c0c7fb31313762"  # MD5校验值
-    sha256: "45ddcf6eee71669e20d761d8c6a4c237d03114bede851800a673ee44de391ee4"  # SHA256校验值
+    size: 22891292  # 文件大小（字节）
+    md5: "2ab8cc6cc78e9c93016d54ec2cf744f9"  # MD5校验值
+    sha256: "83a7a661ae322c8a3bbc4d48aaf1ad78dac0848ae3ddd6871e2379b117ceb8eb"  # SHA256校验值
