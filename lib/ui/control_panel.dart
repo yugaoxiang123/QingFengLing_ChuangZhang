@@ -59,6 +59,8 @@ class _ControlPanelState extends State<ControlPanel> {
 
   // Socket消息订阅
   StreamSubscription? _socketMessageSubscription;
+  // Socket阶段消息订阅
+  StreamSubscription? _socketStageSubscription;
   // Socket服务状态订阅
   StreamSubscription? _socketStatusSubscription;
 
@@ -91,6 +93,7 @@ class _ControlPanelState extends State<ControlPanel> {
 
   // 监听Socket消息
   void _listenToSocketMessages() {
+    // 监听STORY_STATUS消息（用于手动设置）
     _socketMessageSubscription = socketService.listenToMessageType(
       'STORY_STATUS',
       (content) {
@@ -104,6 +107,28 @@ class _ControlPanelState extends State<ControlPanel> {
           }
         } catch (e) {
           print('解析剧情状态消息失败: $e');
+        }
+      },
+    );
+
+    // 监听STAGE消息（来自QFChuanZhang的阶段信息）
+    _socketStageSubscription = socketService.listenToMessageType(
+      'STAGE',
+      (content) {
+        try {
+          // 解析阶段编号（1-8）
+          final stageNumber = int.parse(content.trim());
+          // 阶段编号和剧情状态是一一对应的
+          // STAGE:1 -> 剧情状态1, STAGE:2 -> 剧情状态2, 以此类推
+          if (stageNumber >= 1 && stageNumber <= 8) {
+            // 使用_updateStoryStatus来更新状态，这样会触发相应的功能
+            _updateStoryStatus(stageNumber);
+            print('收到阶段信息: STAGE:$stageNumber，已更新剧情状态为: ${storyStatusMap[stageNumber]}');
+          } else {
+            print('收到无效的阶段编号: $stageNumber（应为1-8）');
+          }
+        } catch (e) {
+          print('解析阶段消息失败: $e');
         }
       },
     );
@@ -581,6 +606,7 @@ class _ControlPanelState extends State<ControlPanel> {
     _timer.cancel();
     _jumpRecoveryTimer?.cancel();
     _socketMessageSubscription?.cancel();
+    _socketStageSubscription?.cancel();
     _socketStatusSubscription?.cancel();
     super.dispose();
   }
