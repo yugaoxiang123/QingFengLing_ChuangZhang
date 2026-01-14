@@ -153,6 +153,53 @@ fi
 echo "✅ 已更新版本信息: v$NEW_VERSION (code: $NEW_VERSION_CODE)"
 echo "✅ 已更新构建日期: $(date +%Y-%m-%d)"
 
+# 9.1. 计算APK的MD5并更新download_url
+echo "🔐 计算APK文件MD5并更新下载链接..."
+
+# 使用Python脚本计算MD5（更稳定，支持大文件）
+PYTHON_SCRIPT="$UPDATE_DIR/generate_file_info.py"
+if [ ! -f "$PYTHON_SCRIPT" ]; then
+    echo "⚠️  警告: generate_file_info.py脚本不存在，跳过download_url更新"
+else
+    APK_MD5=$(python3 "$PYTHON_SCRIPT" "$APK_PATH" --md5-only 2>/dev/null | tr -d ' \n\r')
+    
+    if [ -z "$APK_MD5" ] || [ ${#APK_MD5} -ne 32 ]; then
+        echo "⚠️  警告: 无法计算APK的MD5值，跳过download_url更新"
+    else
+        echo "   APK MD5: $APK_MD5"
+        
+        # 从现有的download_url中提取基础URL部分
+        # 格式: https://shv-software.oss-cn-zhangjiakou.aliyuncs.com/Android-Packages/qfl-publitity/94e5df62b0224768899900fbe7b6e68e.apk
+        # 需要提取: https://shv-software.oss-cn-zhangjiakou.aliyuncs.com/Android-Packages/qfl-publitity/
+        CURRENT_DOWNLOAD_URL=$(grep '^  download_url:' "$YAML_FILE" | sed 's/.*download_url: *"\(.*\)".*/\1/')
+        
+        if [ -n "$CURRENT_DOWNLOAD_URL" ]; then
+            # 提取基础URL（去掉最后的MD5.apk部分）
+            # 使用正则表达式匹配并替换
+            BASE_URL=$(echo "$CURRENT_DOWNLOAD_URL" | sed 's/[a-f0-9]\{32\}\.apk$//')
+            
+            if [ -n "$BASE_URL" ]; then
+                NEW_DOWNLOAD_URL="${BASE_URL}${APK_MD5}.apk"
+                
+                # 更新download_url字段
+                if [[ "$OSTYPE" == "darwin"* ]]; then
+                    # macOS
+                    sed -i '' "s|download_url: \".*\"|download_url: \"$NEW_DOWNLOAD_URL\"|" "$YAML_FILE"
+                else
+                    # Linux
+                    sed -i "s|download_url: \".*\"|download_url: \"$NEW_DOWNLOAD_URL\"|" "$YAML_FILE"
+                fi
+                
+                echo "✅ 已更新download_url: $NEW_DOWNLOAD_URL"
+            else
+                echo "⚠️  警告: 无法从现有download_url中提取基础URL，跳过更新"
+            fi
+        else
+            echo "⚠️  警告: 无法读取现有的download_url，跳过更新"
+        fi
+    fi  # 闭合 if [ -z "$APK_MD5" ] 的 else 块
+fi  # 闭合 if [ ! -f "$PYTHON_SCRIPT" ] 的 else 块
+
 # 10. 显示构建结果
 echo ""
 echo "🎉 构建完成！"
@@ -168,9 +215,8 @@ echo ""
 echo "📋 下一步操作:"
 echo "   1. 检查 update_plugin/update.yaml 文件"
 echo "   2. 更新 description 字段（更新说明）"
-echo "   3. 更新 download_url 字段（下载链接）"
-echo "   4. 部署APK文件到服务器"
-echo "   5. 发布更新配置"
+echo "   3. 部署APK文件到服务器（使用MD5命名的文件）"
+echo "   4. 发布更新配置"
 echo ""
 
 # 11. 显示APK文件信息

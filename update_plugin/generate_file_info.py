@@ -165,8 +165,17 @@ def main():
     parser.add_argument('--yaml', help='要更新的YAML文件路径（可选）')
     parser.add_argument('--output', '-o', help='输出结果到文件（可选）')
     parser.add_argument('--no-date', action='store_true', help='不更新build_date字段')
+    parser.add_argument('--md5-only', action='store_true', help='仅输出MD5值（用于脚本调用）')
     
     args = parser.parse_args()
+    
+    # 如果只需要MD5，直接计算并输出
+    if args.md5_only:
+        md5_hash = calculate_file_hash(args.apk_path, 'md5')
+        if md5_hash is None:
+            sys.exit(1)
+        print(md5_hash)
+        sys.exit(0)
     
     # 生成文件信息
     file_info = generate_file_info(args.apk_path)
