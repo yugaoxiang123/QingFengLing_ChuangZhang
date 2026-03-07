@@ -4,6 +4,17 @@ import 'dart:math' as math;
 import '../services/event_bus.dart';
 import '../services/socket_service.dart'; // 添加socket服务导入
 
+/// 飞船状态控制面板
+/// 
+/// 显示飞船的实时状态信息，包括：
+/// - 当前时间
+/// - 剧情状态（支持手动切换）
+/// - 飞船坐标 (X, Y, Z)
+/// - 飞船姿态 (俯仰角, 偏航角)
+/// - 飞船速度
+/// - 飞船当前动作状态（巡航、加速、跃迁等）
+/// 
+/// 负责监听控制命令和Socket消息来更新这些状态。
 class ControlPanel extends StatefulWidget {
   const ControlPanel({super.key});
 
@@ -19,7 +30,7 @@ class _ControlPanelState extends State<ControlPanel> {
   // 剧情状态
   int _storyStatus = 0; // 默认为0无
 
-  // 剧情状态常量
+  // 剧情状态常量映射
   static const Map<int, String> storyStatusMap = {
     0: "无",
     1: "登船准备",

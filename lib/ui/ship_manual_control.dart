@@ -7,6 +7,15 @@ import 'package:flutter/foundation.dart';
 import '../services/event_bus.dart'; // 导入事件总线
 import '../services/socket_service.dart'; // 导入Socket服务
 
+/// 飞船手动控制组件
+/// 
+/// 提供飞船的手动驾驶功能，支持键盘 (WASD) 和屏幕按钮操作。
+/// 功能包括：
+/// - 基础移动：前进(W)、后退/减速(S)、左转(A)、右转(D)
+/// - 推进加速：空格键
+/// - 跃迁引擎：充能、执行跃迁、取消跃迁 (Enter键)
+/// 
+/// 包含飞船状态的视觉反馈动画，如引擎发光、转向倾斜、跃迁粒子效果等。
 class ShipManualControl extends StatefulWidget {
   const ShipManualControl({super.key});
 
@@ -16,7 +25,7 @@ class ShipManualControl extends StatefulWidget {
 
 class _ShipManualControlState extends State<ShipManualControl>
     with SingleTickerProviderStateMixin {
-  // 键盘焦点节点
+  // 键盘焦点节点，用于接收键盘事件
   final FocusNode _keyboardFocusNode = FocusNode();
 
   // 控制按钮按下状态
@@ -26,20 +35,24 @@ class _ShipManualControlState extends State<ShipManualControl>
   bool _rightPressed = false;
   bool _thrustPressed = false;
 
-  // 跃迁状态
-  double _jumpChargeLevel = 0;
-  bool _isJumpCharging = false;
-  bool _isJumpCharged = false;
-  bool _isJumpExecuting = false; // 跃迁执行中状态
-  Timer? _jumpChargeTimer;
-  Timer? _jumpChargedBlinkTimer;
-  Timer? _jumpExecuteTimer; // 跃迁执行计时器
-  Timer? _jumpPulseTimer; // 跃迁脉冲效果计时器
+  // 跃迁状态管理
+  double _jumpChargeLevel = 0;   // 充能进度 0.0-1.0
+  bool _isJumpCharging = false;  // 是否正在充能
+  bool _isJumpCharged = false;   // 是否充能完成
+  bool _isJumpExecuting = false; // 是否正在执行跃迁
+  
+  // 定时器管理
+  Timer? _jumpChargeTimer;       // 充能进度定时器
+  Timer? _jumpChargedBlinkTimer; // 充能完成闪烁定时器
+  Timer? _jumpExecuteTimer;      // 跃迁执行过程定时器
+  Timer? _jumpPulseTimer;        // 跃迁脉冲效果定时器
+  
+  // 视觉效果变量
   double _jumpChargedGlowOpacity = 0.0;
-  double _jumpPulseEffect = 0.0; // 跃迁脉冲效果
+  double _jumpPulseEffect = 0.0; // 跃迁脉冲效果强度
 
   // 跃迁粒子效果
-  List<JumpParticle> _jumpParticles = [];
+  final List<JumpParticle> _jumpParticles = [];
   Timer? _particleTimer;
 
   // 飞船动画控制器
@@ -788,7 +801,7 @@ class _ShipManualControlState extends State<ShipManualControl>
                     ),
                   ),
                 )
-                .toList(),
+                ,
 
           // 飞船主体 - 确保放在最上层
           Center(

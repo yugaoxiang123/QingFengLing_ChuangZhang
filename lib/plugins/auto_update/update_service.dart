@@ -8,6 +8,13 @@ import 'update_info.dart';
 import 'app_install_helper.dart';
 
 /// 更新服务
+/// 
+/// 核心更新逻辑的实现类。负责：
+/// 1. **检查更新**：向服务器请求最新的版本信息（YAML格式）。
+/// 2. **版本比较**：对比本地版本和服务器版本。
+/// 3. **文件下载**：支持大文件下载、断点续传（通过Dio）。
+/// 4. **完整性校验**：下载完成后校验MD5和SHA256，防止文件损坏或被篡改。
+/// 5. **安装流程**：调用`AppInstallHelper`执行安装。
 class UpdateService {
   static final UpdateService _instance = UpdateService._internal();
   factory UpdateService() => _instance;
@@ -78,6 +85,11 @@ class UpdateService {
   }
 
   /// 检查更新
+  /// 
+  /// 向服务器发送请求，获取最新的版本信息。
+  /// 支持通过[serverUrl]和[updatePath]自定义更新源。
+  /// 
+  /// 返回[UpdateInfo]对象如果发现新版本，否则返回null。
   Future<UpdateInfo?> checkUpdate({
     String? serverUrl,
     String? updatePath,
@@ -216,7 +228,7 @@ class UpdateService {
             updateData['description'] = '';
           }
           final descLine = line.substring(1).trim();
-          updateData['description'] = (updateData['description'] as String) + descLine + '\n';
+          updateData['description'] = '${updateData['description'] as String}$descLine\n';
         }
         
         // 检测section结束
@@ -236,7 +248,7 @@ class UpdateService {
       final latestVersionCode = updateData['version_code'] ?? 0;
       
       if (latestVersion.isNotEmpty && latestVersionCode > currentVersionCode) {
-        print('发现新版本: $latestVersion (${latestVersionCode})');
+        print('发现新版本: $latestVersion ($latestVersionCode)');
         return UpdateInfo.fromJson(updateData);
       }
       
@@ -248,6 +260,11 @@ class UpdateService {
   }
 
   /// 下载更新
+  /// 
+  /// 根据[UpdateInfo]中的下载地址下载APK文件。
+  /// 下载完成后会自动进行MD5和SHA256校验。
+  /// 
+  /// 返回下载后的文件绝对路径，如果下载失败或校验失败则返回null。
   Future<String?> downloadUpdate(
     UpdateInfo updateInfo, {
     Function(double)? onProgress,

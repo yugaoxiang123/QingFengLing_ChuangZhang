@@ -1,6 +1,14 @@
 import 'package:flutter/material.dart';
 import '../services/socket_service.dart';
 
+/// Socket服务器状态页面
+/// 
+/// 管理和展示Socket服务器的运行状态，包括：
+/// - 服务器启动/停止控制
+/// - 服务器IP和端口信息
+/// - 当前连接的客户端列表（Socket和WebSocket）
+/// - 实时消息日志监控
+/// - 向客户端发送测试消息的功能
 class SocketServerPage extends StatefulWidget {
   const SocketServerPage({super.key});
 
@@ -13,8 +21,8 @@ class _SocketServerPageState extends State<SocketServerPage> {
   final SocketService _socketService = socketService;
   bool _isServerRunning = false;
   String _statusMessage = "服务未启动";
-  List<ClientConnection> _connectedClients = []; // 更新为ClientConnection类型
-  List<MessageLog> _messageLogs = []; // 消息日志列表
+  List<ClientConnection> _connectedClients = []; // 当前连接的客户端列表
+  List<MessageLog> _messageLogs = []; // 历史消息日志列表
   final TextEditingController _testMessageController = TextEditingController(
     text: "测试消息",
   );
@@ -22,6 +30,7 @@ class _SocketServerPageState extends State<SocketServerPage> {
   @override
   void initState() {
     super.initState();
+    // 设置流监听器以响应Socket服务状态变化
     _setupListeners();
     // 初始化页面状态
     _updateInitialState();

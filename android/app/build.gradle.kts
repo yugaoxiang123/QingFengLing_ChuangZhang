@@ -1,4 +1,4 @@
-// 添加以下导入
+// Add the following imports
 import java.util.Properties
 import java.io.FileInputStream
 
@@ -12,18 +12,20 @@ plugins {
 android {
     val keystoreProperties = Properties().apply {
         val keystorePropertiesFile = rootProject.file("./keystore.properties")
-        println("属性文件路径: ${keystorePropertiesFile.absolutePath}") // 打印路径
+        println("Keystore file path: ${keystorePropertiesFile.absolutePath}")
         if (keystorePropertiesFile.exists()) {
             load(FileInputStream(keystorePropertiesFile))
-            println("加载的属性: $this") // 打印所有属性
+            // Avoid printing sensitive information like passwords in build logs
+            println("Keystore properties loaded successfully.")
         } else {
-            throw GradleException("keystore.properties 文件未找到")
+            throw GradleException("keystore.properties file not found")
         }
     }
 
     signingConfigs {
-        create("release") {  // 使用 create 方法
-            storeFile = file(keystoreProperties.getProperty("storeFile") ?: throw GradleException("storeFile 未定义"))
+        create("release") {
+            val storeFileName = keystoreProperties.getProperty("storeFile") ?: throw GradleException("storeFile not defined in keystore.properties")
+            storeFile = file(storeFileName)
             storePassword = keystoreProperties["storePassword"] as String
             keyAlias = keystoreProperties["keyAlias"] as String
             keyPassword = keystoreProperties["keyPassword"] as String

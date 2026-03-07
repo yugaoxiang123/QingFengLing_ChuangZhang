@@ -4,12 +4,15 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-// 消息日志类
+/// 消息日志类
+/// 
+/// 用于记录和展示Socket通信中的收发消息。
+/// 包含客户端地址、消息内容、时间戳和消息方向（接收/发送）。
 class MessageLog {
-  final String clientAddress;
-  final String message;
-  final DateTime timestamp;
-  final bool isIncoming; // 是否为接收的消息
+  final String clientAddress; // 客户端地址
+  final String message;       // 消息内容
+  final DateTime timestamp;   // 记录时间
+  final bool isIncoming;      // true表示接收的消息，false表示发送的消息
 
   MessageLog({
     required this.clientAddress,
@@ -18,6 +21,7 @@ class MessageLog {
     required this.isIncoming,
   });
 
+  /// 获取格式化的时间字符串 HH:mm:ss
   String get formattedTime =>
       '${timestamp.hour}:${timestamp.minute.toString().padLeft(2, '0')}:${timestamp.second.toString().padLeft(2, '0')}';
 
@@ -28,12 +32,14 @@ class MessageLog {
   }
 }
 
-// 客户端连接类
+/// 客户端连接类
+/// 
+/// 封装了连接的客户端信息，统一管理TCP Socket和WebSocket连接。
 class ClientConnection {
-  final String clientAddress;
-  final String clientType; // "Socket" 或 "WebSocket"
-  final DateTime connectTime;
-  final dynamic connection; // Socket 或 WebSocket 对象
+  final String clientAddress; // 客户端IP:端口
+  final String clientType;    // 连接类型："Socket" 或 "WebSocket"
+  final DateTime connectTime; // 连接建立时间
+  final dynamic connection;   // 底层连接对象：Socket 或 WebSocket
 
   ClientConnection({
     required this.clientAddress,
@@ -42,27 +48,34 @@ class ClientConnection {
     required this.connection,
   });
 
+  /// 获取显示名称
   String get displayName => "$clientType客户端: $clientAddress";
 
+  /// 获取格式化的连接时间 MM-dd HH:mm:ss
   String get formattedConnectTime {
     return '${connectTime.month}-${connectTime.day} ${connectTime.hour}:${connectTime.minute.toString().padLeft(2, '0')}:${connectTime.second.toString().padLeft(2, '0')}';
   }
 }
 
-// 全局访问点
+// 全局单例访问点
 final socketService = SocketService();
 
+/// Socket服务类
+/// 
+/// 负责管理TCP Socket和WebSocket服务器的生命周期。
+/// 提供启动/停止服务、处理连接、广播消息、发送特定消息等功能。
+/// 实现了单例模式，确保全局只有一个服务实例。
 class SocketService {
   bool isServerRunning = false;
   String statusMessage = "服务未启动";
-  List<ClientConnection> clientConnections = [];
-  ServerSocket? server;
-  HttpServer? httpServer;
-  List<Socket> sockets = [];
-  List<WebSocket> webSockets = [];
+  List<ClientConnection> clientConnections = []; // 当前所有活跃连接
+  ServerSocket? server;      // TCP Socket服务器实例
+  HttpServer? httpServer;    // WebSocket服务器实例（基于HttpServer升级）
+  List<Socket> sockets = []; // 活跃的TCP Socket列表
+  List<WebSocket> webSockets = []; // 活跃的WebSocket列表
   String serverIp = "0.0.0.0";
-  int serverPort = 8888;
-  int webSocketPort = 8889; // WebSocket使用不同的端口
+  int serverPort = 8888;     // TCP服务端口
+  int webSocketPort = 8889;  // WebSocket服务端口
 
   // 消息日志
   final List<MessageLog> _messageLogs = [];

@@ -1,7 +1,14 @@
 import 'dart:io';
 
 /// Root检测服务
-/// 用于检测Android设备是否已经被root
+/// 
+/// 用于检测Android设备是否已经被root。
+/// 检测原理：
+/// 1. 尝试执行`su`命令。
+/// 2. 检查系统目录中是否存在常见的root二进制文件（如`/system/bin/su`）。
+/// 3. 检查是否安装了常见的root管理应用（如SuperSU, Magisk）。
+/// 
+/// 仅用于判断是否可以使用静默安装功能。
 class RootDetectionService {
   static final RootDetectionService _instance =
       RootDetectionService._internal();

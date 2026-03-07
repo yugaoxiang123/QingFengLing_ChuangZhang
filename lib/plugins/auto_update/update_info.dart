@@ -1,4 +1,7 @@
 /// 更新信息模型
+/// 
+/// 对应服务器返回的YAML配置信息。
+/// 包含版本号、更新说明、下载地址、文件校验信息等。
 class UpdateInfo {
   final String version;
   final int versionCode;

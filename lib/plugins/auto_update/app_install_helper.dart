@@ -8,7 +8,13 @@ import 'root_detection_service.dart';
 
 
 /// APK安装辅助类
-/// 提供多种安装APK的方法，增强安装成功率
+/// 
+/// 提供多种安装APK的方法，旨在提高在不同Android版本和设备状态下的安装成功率。
+/// 
+/// 主要功能：
+/// 1. **权限管理**：检查并请求"安装未知来源应用"权限。
+/// 2. **Root静默安装**：检测设备是否Root，如果已Root，尝试使用`su`命令进行后台静默安装。
+/// 3. **常规安装**：对于非Root设备，使用标准的`Intent`机制（通过`open_file`插件）调用系统安装程序。
 class AppInstallHelper {
   static final AppInstallHelper _instance = AppInstallHelper._internal();
   factory AppInstallHelper() => _instance;
@@ -25,6 +31,9 @@ class AppInstallHelper {
   }
 
   /// 检查并请求安装权限
+  /// 
+  /// 如果权限未授予，会尝试请求权限。
+  /// 如果权限被永久拒绝，会引导用户去设置页面开启。
   Future<bool> checkAndRequestInstallPermission() async {
     try {
       // 检查当前权限状态
@@ -65,6 +74,8 @@ class AppInstallHelper {
   }
 
   /// 显示权限请求对话框
+  /// 
+  /// 向用户解释为什么需要安装权限，并在用户同意后请求权限。
   Future<bool> showPermissionDialog(BuildContext context) async {
     final completer = Completer<bool>();
     
@@ -142,7 +153,15 @@ class AppInstallHelper {
   }
 
   /// 安装APK文件
-  /// 尝试多种方式安装APK，提高安装成功率
+  /// 
+  /// 尝试多种方式安装APK，流程如下：
+  /// 1. 检查文件是否存在及大小。
+  /// 2. 检测设备是否Root：
+  ///    - 如果Root，尝试多种静默安装方法。
+  ///    - 如果静默安装成功，直接返回。
+  /// 3. 如果非Root或静默安装失败：
+  ///    - 检查并请求安装权限。
+  ///    - 使用`OpenFile`调用系统标准安装流程。
   Future<bool> installApk(String filePath) async {
     try {
       print('开始安装APK: $filePath');
@@ -225,8 +244,17 @@ class AppInstallHelper {
   }
 
   /// 在已root的设备上静默安装APK
-  /// 尝试多种root安装命令，提高兼容性
-  /// 返回布尔值，表示安装是否成功
+  /// 
+  /// 尝试多种root安装命令，提高兼容性。
+  /// 方法包括：
+  /// 1. `su -c pm install`
+  /// 2. `su 0 cmd package install` (Android 8.0+)
+  /// 3. Magisk 方式
+  /// 4. `echo | su` 管道方式
+  /// 5. 临时 Shell 脚本方式
+  /// 6. `busybox` 方式
+  /// 
+  /// 返回布尔值，表示安装是否成功。
   Future<bool> _installSilentlyOnRootedDevice(String filePath) async {
     try {
       print('尝试在已root设备上静默安装APK');
