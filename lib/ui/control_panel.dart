@@ -45,7 +45,7 @@ class _ControlPanelState extends State<ControlPanel> {
 
   // 飞船状态数据
   Map<String, double> _shipCoordinates = {'x': 120.5, 'y': 45.8, 'z': 78.2};
-  Map<String, double> _shipAngles = {'pitch': 15.2, 'yaw': 3.7, 'roll': 0.5};
+  final Map<String, double> _shipAngles = {'pitch': 15.2, 'yaw': 3.7, 'roll': 0.5};
   double _shipSpeed = 20.0; // 初始速度设置为20
   String _shipAttitude = "巡航"; // 初始姿态为巡航
 
@@ -64,9 +64,9 @@ class _ControlPanelState extends State<ControlPanel> {
 
   // 目标速度和当前速度
   double _targetSpeed = 20.0; // 初始目标速度设置为20
-  double _maxNormalSpeed = 370.0;
-  double _maxThrustSpeed = 570.0;
-  double _warpSpeed = 299792458.0; // 光速 m/s
+  final double _maxNormalSpeed = 370.0;
+  final double _maxThrustSpeed = 570.0;
+  final double _warpSpeed = 299792458.0; // 光速 m/s
 
   // Socket消息订阅
   StreamSubscription? _socketMessageSubscription;
@@ -642,7 +642,7 @@ class _ControlPanelState extends State<ControlPanel> {
     return Container(
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceVariant,
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(8.0),
       ),
       margin: const EdgeInsets.all(16.0),

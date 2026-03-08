@@ -178,7 +178,7 @@ class SocketService {
         print("Socket服务器绑定成功");
       } catch (e) {
         print("Socket服务器绑定失败: $e");
-        throw e;
+        rethrow;
       }
 
       try {
@@ -194,7 +194,7 @@ class SocketService {
         // 如果Socket服务器已启动但WebSocket启动失败，需要关闭Socket服务器
         server?.close();
         server = null;
-        throw e;
+        rethrow;
       }
 
       isServerRunning = true;
