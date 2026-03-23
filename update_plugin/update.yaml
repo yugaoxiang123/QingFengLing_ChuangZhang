@@ -1,0 +1,28 @@
+# 软件更新配置文件
+# 此文件用于配置软件自动更新功能
+
+# 最新版本信息
+latest_version:
+  version: "0.1.16"
+  version_code: 116
+  build_date: "2026-03-18"
+  
+  # 更新类型
+  # 0: 普通更新（用户可选择）
+  # 1: 强制更新（必须更新）
+  # 2: 静默更新（后台自动更新）
+  update_type: 1
+  
+  # 更新说明
+  description: |
+    版本 0.1.8 更新内容：
+    - 向控制面板发送剧情更改消息
+    
+  # 下载链接
+  download_url: "https://shv-software.oss-cn-zhangjiakou.aliyuncs.com/Android-Packages/qfl-chuanzhang/dc2e32c2347e0cac7a3dfa4521aac6fd.apk"
+  
+  # 文件信息
+  file_info:
+    size: 52039074  # 文件大小（字节）
+    md5: "dc2e32c2347e0cac7a3dfa4521aac6fd"  # MD5校验值
+    sha256: "e844cffe3ea446b9b4eaeadddf868f5abc20460642b1f046a0366b05ae7928ea"  # SHA256校验值

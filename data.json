@@ -1,0 +1,45 @@
+{
+  "description": "更新每个视频的url即可，客户端会读取url进行下载，注意对应关系",
+  "videos": [
+    {
+      "index": 1,
+      "name": "登船准备",
+      "url": "https://shv-medias.oss-cn-zhangjiakou.aliyuncs.com/QFL/chuanzhang/1.mp4"
+    },
+    {
+      "index": 2,
+      "name": "飞船起飞",
+      "url": "https://shv-medias.oss-cn-zhangjiakou.aliyuncs.com/QFL/chuanzhang/2.mp4"
+    },
+    {
+      "index": 3,
+      "name": "雷电防护",
+      "url": "https://shv-medias.oss-cn-zhangjiakou.aliyuncs.com/QFL/chuanzhang/3.mp4"
+    },
+    {
+      "index": 4,
+      "name": "捕捉垃圾",
+      "url": "https://shv-medias.oss-cn-zhangjiakou.aliyuncs.com/QFL/chuanzhang/4.mp4"
+    },
+    {
+      "index": 5,
+      "name": "击碎陨石",
+      "url": "https://shv-medias.oss-cn-zhangjiakou.aliyuncs.com/QFL/chuanzhang/5.mp4"
+    },
+    {
+      "index": 6,
+      "name": "行星科普",
+      "url": "https://shv-medias.oss-cn-zhangjiakou.aliyuncs.com/QFL/chuanzhang/6.mp4"
+    },
+    {
+      "index": 7,
+      "name": "加速飞行",
+      "url": "https://shv-medias.oss-cn-zhangjiakou.aliyuncs.com/QFL/chuanzhang/7.mp4"
+    },
+    {
+      "index": 8,
+      "name": "抵达月球",
+      "url": "https://shv-medias.oss-cn-zhangjiakou.aliyuncs.com/QFL/chuanzhang/8.mp4"
+    }
+  ]
+}
