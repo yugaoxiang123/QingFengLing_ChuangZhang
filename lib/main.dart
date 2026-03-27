@@ -45,9 +45,9 @@ class _StageVideoPageState extends State<StageVideoPage> {
   // 索引与控制面板阶段号映射见 _sendCurrentStage
   final List<String> stages = [
     '舷窗关闭', // stageIndex = 0，对应控制面板阶段 1（与“登船准备”共享）
+    '雷电防护',
     '登船准备',
     '飞船起飞',
-    '雷电防护',
     '捕捉垃圾',
     '击碎陨石',
     '行星科普',
@@ -657,7 +657,7 @@ class _StageVideoPageState extends State<StageVideoPage> {
                         onPressed: _handleBottomStageButtonPressed,
                       )
                     : _FuturisticButton(
-                        text: '返回初始',
+                        text: '返程维护',
                         onPressed: _handleBottomStageButtonPressed,
                       ),
               ),
