@@ -64,6 +64,24 @@ flutter run
 flutter build apk --release
 ```
 
+### Release 签名配置（必需）
+
+首次打包 release 前，请先配置签名文件：
+
+```bash
+# 1) 复制模板
+cp android/keystore.properties.example android/keystore.properties
+```
+
+然后编辑 `android/keystore.properties`，填写：
+
+- `storeFile`：你的 `.jks` 路径（支持绝对路径，或相对 `android/` 路径）
+- `storePassword`
+- `keyAlias`
+- `keyPassword`
+
+未正确配置时，Gradle 会明确报错并提示你修正 `storeFile`。
+
 ## 📦 版本发布与部署
 
 项目包含一套自动化的版本发布工具，位于 `update_plugin/` 目录下。

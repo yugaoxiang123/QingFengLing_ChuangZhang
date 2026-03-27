@@ -11,6 +11,19 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 UPDATE_DIR="$SCRIPT_DIR/update_plugin"
 PUBSPEC_FILE="$SCRIPT_DIR/pubspec.yaml"
 
+# Resolve a usable Python command across Linux/macOS/Git-Bash on Windows.
+PYTHON_CMD=""
+if command -v python3 >/dev/null 2>&1 && python3 -c "import sys; sys.exit(0 if sys.version_info.major >= 3 else 1)" >/dev/null 2>&1; then
+    PYTHON_CMD="python3"
+elif command -v python >/dev/null 2>&1 && python -c "import sys; sys.exit(0 if sys.version_info.major >= 3 else 1)" >/dev/null 2>&1; then
+    PYTHON_CMD="python"
+elif command -v py >/dev/null 2>&1 && py -3 -c "import sys; sys.exit(0 if sys.version_info.major >= 3 else 1)" >/dev/null 2>&1; then
+    PYTHON_CMD="py -3"
+else
+    echo "❌ 错误: 未找到可用的Python解释器（python3/python/py）"
+    exit 1
+fi
+
 echo "🚀 开始自动化构建流程..."
 
 # 检查pubspec.yaml文件是否存在
@@ -82,18 +95,36 @@ flutter pub get
 
 # 5. 构建APK
 echo "🔨 构建APK..."
-flutter build apk --release --build-name="$NEW_VERSION" --build-number="$NEW_VERSION_CODE"
+flutter build apk --release --split-per-abi --build-name="$NEW_VERSION" --build-number="$NEW_VERSION_CODE"
 
 # 检查构建是否成功
-if [ ! -f "build/app/outputs/flutter-apk/app-release.apk" ]; then
-    echo "❌ 错误: APK构建失败！"
+SOURCE_APK_PATH="$SCRIPT_DIR/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk"
+if [ ! -f "$SOURCE_APK_PATH" ]; then
+    echo "❌ 错误: arm64-v8a APK构建失败！"
     exit 1
 fi
 
-echo "✅ APK构建成功！"
+echo "✅ APK构建成功（arm64-v8a）！"
 
-# 6. 创建带版本号的APK文件名
-APK_NAME="app_v${NEW_VERSION}.apk"
+# 6. 计算APK的MD5并使用MD5作为文件名（与download_url保持一致）
+echo "🔐 计算APK文件MD5..."
+PYTHON_SCRIPT="$UPDATE_DIR/generate_file_info.py"
+APK_MD5=""
+
+if [ ! -f "$PYTHON_SCRIPT" ]; then
+    echo "⚠️  警告: generate_file_info.py脚本不存在，使用版本号命名APK"
+    APK_NAME="app_v${NEW_VERSION}.apk"
+else
+    APK_MD5=$(PYTHONIOENCODING=utf-8 $PYTHON_CMD "$PYTHON_SCRIPT" "$SOURCE_APK_PATH" --md5-only 2>/dev/null | tr -d ' \n\r')
+    if [ -z "$APK_MD5" ] || [ ${#APK_MD5} -ne 32 ]; then
+        echo "⚠️  警告: 无法计算APK的MD5值，使用版本号命名APK"
+        APK_NAME="app_v${NEW_VERSION}.apk"
+    else
+        APK_NAME="${APK_MD5}.apk"
+        echo "   APK MD5: $APK_MD5"
+    fi
+fi
+
 APK_PATH="$UPDATE_DIR/$APK_NAME"
 
 # 确保update_plugin目录存在
@@ -104,7 +135,7 @@ fi
 
 # 7. 复制APK到更新目录
 echo "📦 复制APK到更新目录..."
-cp "build/app/outputs/flutter-apk/app-release.apk" "$APK_PATH"
+cp "$SOURCE_APK_PATH" "$APK_PATH"
 echo "   APK文件: $APK_NAME"
 
 # 8. 生成文件信息
@@ -153,52 +184,32 @@ fi
 echo "✅ 已更新版本信息: v$NEW_VERSION (code: $NEW_VERSION_CODE)"
 echo "✅ 已更新构建日期: $(date +%Y-%m-%d)"
 
-# 9.1. 计算APK的MD5并更新download_url
-echo "🔐 计算APK文件MD5并更新下载链接..."
+# 9.1. 更新download_url（优先使用MD5命名）
+echo "🔗 更新下载链接..."
+if [ -n "$APK_MD5" ] && [ ${#APK_MD5} -eq 32 ]; then
+    # 从现有的download_url中提取基础URL部分
+    CURRENT_DOWNLOAD_URL=$(grep '^  download_url:' "$YAML_FILE" | sed 's/.*download_url: *"\(.*\)".*/\1/')
 
-# 使用Python脚本计算MD5（更稳定，支持大文件）
-PYTHON_SCRIPT="$UPDATE_DIR/generate_file_info.py"
-if [ ! -f "$PYTHON_SCRIPT" ]; then
-    echo "⚠️  警告: generate_file_info.py脚本不存在，跳过download_url更新"
-else
-    APK_MD5=$(python3 "$PYTHON_SCRIPT" "$APK_PATH" --md5-only 2>/dev/null | tr -d ' \n\r')
-    
-    if [ -z "$APK_MD5" ] || [ ${#APK_MD5} -ne 32 ]; then
-        echo "⚠️  警告: 无法计算APK的MD5值，跳过download_url更新"
-    else
-        echo "   APK MD5: $APK_MD5"
-        
-        # 从现有的download_url中提取基础URL部分
-        # 格式: https://shv-software.oss-cn-zhangjiakou.aliyuncs.com/Android-Packages/qfl-publitity/94e5df62b0224768899900fbe7b6e68e.apk
-        # 需要提取: https://shv-software.oss-cn-zhangjiakou.aliyuncs.com/Android-Packages/qfl-publitity/
-        CURRENT_DOWNLOAD_URL=$(grep '^  download_url:' "$YAML_FILE" | sed 's/.*download_url: *"\(.*\)".*/\1/')
-        
-        if [ -n "$CURRENT_DOWNLOAD_URL" ]; then
-            # 提取基础URL（去掉最后的MD5.apk部分）
-            # 使用正则表达式匹配并替换
-            BASE_URL=$(echo "$CURRENT_DOWNLOAD_URL" | sed 's/[a-f0-9]\{32\}\.apk$//')
-            
-            if [ -n "$BASE_URL" ]; then
-                NEW_DOWNLOAD_URL="${BASE_URL}${APK_MD5}.apk"
-                
-                # 更新download_url字段
-                if [[ "$OSTYPE" == "darwin"* ]]; then
-                    # macOS
-                    sed -i '' "s|download_url: \".*\"|download_url: \"$NEW_DOWNLOAD_URL\"|" "$YAML_FILE"
-                else
-                    # Linux
-                    sed -i "s|download_url: \".*\"|download_url: \"$NEW_DOWNLOAD_URL\"|" "$YAML_FILE"
-                fi
-                
-                echo "✅ 已更新download_url: $NEW_DOWNLOAD_URL"
+    if [ -n "$CURRENT_DOWNLOAD_URL" ]; then
+        BASE_URL=$(echo "$CURRENT_DOWNLOAD_URL" | sed 's/[a-f0-9]\{32\}\.apk$//')
+
+        if [ -n "$BASE_URL" ]; then
+            NEW_DOWNLOAD_URL="${BASE_URL}${APK_MD5}.apk"
+            if [[ "$OSTYPE" == "darwin"* ]]; then
+                sed -i '' "s|download_url: \".*\"|download_url: \"$NEW_DOWNLOAD_URL\"|" "$YAML_FILE"
             else
-                echo "⚠️  警告: 无法从现有download_url中提取基础URL，跳过更新"
+                sed -i "s|download_url: \".*\"|download_url: \"$NEW_DOWNLOAD_URL\"|" "$YAML_FILE"
             fi
+            echo "✅ 已更新download_url: $NEW_DOWNLOAD_URL"
         else
-            echo "⚠️  警告: 无法读取现有的download_url，跳过更新"
+            echo "⚠️  警告: 无法从现有download_url中提取基础URL，跳过更新"
         fi
-    fi  # 闭合 if [ -z "$APK_MD5" ] 的 else 块
-fi  # 闭合 if [ ! -f "$PYTHON_SCRIPT" ] 的 else 块
+    else
+        echo "⚠️  警告: 无法读取现有的download_url，跳过更新"
+    fi
+else
+    echo "⚠️  警告: 当前APK未使用MD5命名，跳过download_url更新"
+fi
 
 # 10. 显示构建结果
 echo ""
@@ -209,7 +220,7 @@ echo "   pubspec.yaml: $CURRENT_VERSION → $NEW_VERSION"
 echo "   版本代码: $NEW_VERSION_CODE"
 echo ""
 echo "📁 APK文件位置:"
-echo "   原始: build/app/outputs/flutter-apk/app-release.apk"
+echo "   原始: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk"
 echo "   更新: update_plugin/$APK_NAME"
 echo ""
 echo "📋 下一步操作:"

@@ -32,8 +32,21 @@ echo "APK文件: $APK_FILE"
 echo "YAML文件: update.yaml"
 echo ""
 
+# Resolve a usable Python command across Linux/macOS/Git-Bash on Windows.
+PYTHON_CMD=""
+if command -v python3 >/dev/null 2>&1 && python3 -c "import sys; sys.exit(0 if sys.version_info.major >= 3 else 1)" >/dev/null 2>&1; then
+    PYTHON_CMD="python3"
+elif command -v python >/dev/null 2>&1 && python -c "import sys; sys.exit(0 if sys.version_info.major >= 3 else 1)" >/dev/null 2>&1; then
+    PYTHON_CMD="python"
+elif command -v py >/dev/null 2>&1 && py -3 -c "import sys; sys.exit(0 if sys.version_info.major >= 3 else 1)" >/dev/null 2>&1; then
+    PYTHON_CMD="py -3"
+else
+    echo "❌ 错误: 未找到可用的Python解释器（python3/python/py）"
+    exit 1
+fi
+
 # 运行Python脚本
-python3 "$SCRIPT_DIR/generate_file_info.py" "$APK_PATH" --yaml "$YAML_PATH"
+PYTHONIOENCODING=utf-8 $PYTHON_CMD "$SCRIPT_DIR/generate_file_info.py" "$APK_PATH" --yaml "$YAML_PATH"
 
 if [ $? -eq 0 ]; then
     echo ""
