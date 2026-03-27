@@ -578,7 +578,7 @@ class _ControlPanelState extends State<ControlPanel> {
 
   // 更新剧情状态
   void _updateStoryStatus(int newStatus) {
-    if (_storyStatus == newStatus) return; // 如果状态没变，不处理
+    if (_storyStatus == newStatus && newStatus != 1) return; // 如果状态没变，不处理
 
     setState(() {
       _storyStatus = newStatus;
