@@ -84,41 +84,38 @@ class UpdateService {
     return false;
   }
 
-  /// 检查更新
-  /// 
-  /// 向服务器发送请求，获取最新的版本信息。
-  /// 支持通过[serverUrl]和[updatePath]自定义更新源。
-  /// 
-  /// 返回[UpdateInfo]对象如果发现新版本，否则返回null。
-  Future<UpdateInfo?> checkUpdate({
+  /// 检查更新并返回结构化结果（用于界面提示）。
+  Future<UpdateCheckOutcome> performUpdateCheck({
     String? serverUrl,
     String? updatePath,
     bool showToast = true,
     bool forceCheck = false,
   }) async {
-    if (_isChecking) return null;
+    if (_isChecking) {
+      return const UpdateCheckOutcome(
+        message: '上一次检查尚未结束，请稍候再试',
+      );
+    }
     _isChecking = true;
 
     try {
-      // 获取当前应用信息
       final packageInfo = await PackageInfo.fromPlatform();
       final currentVersion = packageInfo.version;
       final buildNumber = int.parse(packageInfo.buildNumber);
 
       print('当前版本: $currentVersion (${packageInfo.buildNumber})');
 
-      // 检查是否需要检查更新（避免频繁检查）
       if (!forceCheck && !await _shouldCheckUpdate() && !showToast) {
-        _isChecking = false;
         print('短时间（${UpdateConfig.checkIntervalSeconds}秒）内重复检测无需检查更新');
-        return null;
+        return const UpdateCheckOutcome(
+          message: '未到检查间隔（仅内部逻辑使用）',
+        );
       }
 
-      // 构建请求URL
-      final url = '${serverUrl ?? UpdateConfig.defaultServerUrl}${updatePath ?? UpdateConfig.defaultUpdatePath}';
+      final url =
+          '${serverUrl ?? UpdateConfig.defaultServerUrl}${updatePath ?? UpdateConfig.defaultUpdatePath}';
       print('检查更新URL: $url');
 
-      // 请求服务器检查更新
       final response = await _dio.get(
         url,
         queryParameters: {
@@ -128,38 +125,77 @@ class UpdateService {
         },
       );
 
-      // 保存最后检查时间
       await _saveLastCheckTime();
 
-      if (response.statusCode == 200 && response.data != null) {
-        // 解析YAML响应
-        final yamlContent = response.data.toString();
-        final updateInfo = _parseYamlResponse(yamlContent, currentVersion, buildNumber);
-        
-        if (updateInfo != null) {
-          // 检查版本号是否大于当前版本
-          if (_isNewerVersion(updateInfo.version, currentVersion)) {
-            _isChecking = false;
-            return updateInfo;
-          }
-        }
+      if (response.statusCode != 200 || response.data == null) {
+        return UpdateCheckOutcome(
+          message: '服务器无有效响应（HTTP ${response.statusCode ?? 0}）',
+        );
+      }
+
+      final yamlContent = response.data.toString();
+      final updateInfo = _parseYamlResponse(yamlContent);
+
+      if (updateInfo == null) {
+        return const UpdateCheckOutcome(
+          message:
+              '无法从 update.yaml 解析出有效的 version，或 YAML 格式异常。',
+        );
+      }
+
+      // 仅按 version 三段号（x.y.z）比较，不比较 versionCode
+      if (!_isNewerVersion(updateInfo.version, currentVersion)) {
+        return UpdateCheckOutcome(
+          message:
+              '当前已是最新版本。本机 $currentVersion，服务器 ${updateInfo.version}（仅按 version 比较）。',
+        );
       }
 
       if (showToast) {
-        print('当前已是最新版本');
+        print('发现新版本: ${updateInfo.version} (${updateInfo.versionCode})');
       }
 
-      _isChecking = false;
-      return null;
+      return UpdateCheckOutcome(info: updateInfo, message: '');
+    } on DioException catch (e) {
+      print('检查更新失败: $e');
+      return UpdateCheckOutcome(
+        message: '网络请求失败：${e.message ?? e.type.name}',
+      );
     } catch (e) {
       print('检查更新失败: $e');
+      return UpdateCheckOutcome(message: '检查更新失败：$e');
+    } finally {
       _isChecking = false;
-      return null;
     }
   }
 
-  /// 解析YAML响应
-  UpdateInfo? _parseYamlResponse(String yamlContent, String currentVersion, int currentVersionCode) {
+  /// 检查更新
+  ///
+  /// 向服务器发送请求，获取最新的版本信息。
+  /// 返回[UpdateInfo]对象如果发现新版本，否则返回null。
+  Future<UpdateInfo?> checkUpdate({
+    String? serverUrl,
+    String? updatePath,
+    bool showToast = true,
+    bool forceCheck = false,
+  }) async {
+    final outcome = await performUpdateCheck(
+      serverUrl: serverUrl,
+      updatePath: updatePath,
+      showToast: showToast,
+      forceCheck: forceCheck,
+    );
+    if (showToast && !outcome.hasNewVersion && outcome.message.isNotEmpty) {
+      if (!outcome.message.contains('未到检查间隔') &&
+          !outcome.message.contains('上一次检查尚未结束')) {
+        print(outcome.message);
+      }
+    }
+    return outcome.info;
+  }
+
+  /// 解析 YAML 中 latest_version；只要存在 [version] 即返回 [UpdateInfo]（不参与是否“有新版本”判断）。
+  UpdateInfo? _parseYamlResponse(String yamlContent) {
     try {
       // 简单的YAML解析（这里简化处理，实际项目中可以使用yaml包）
       final lines = yamlContent.split('\n');
@@ -243,16 +279,17 @@ class UpdateService {
         updateData['file_info'] = fileInfo;
       }
       
-      // 检查是否有更新
-      final latestVersion = updateData['version'] ?? '';
-      final latestVersionCode = updateData['version_code'] ?? 0;
-      
-      if (latestVersion.isNotEmpty && latestVersionCode > currentVersionCode) {
-        print('发现新版本: $latestVersion ($latestVersionCode)');
-        return UpdateInfo.fromJson(updateData);
+      final latestVersion = updateData['version']?.toString().trim() ?? '';
+      if (latestVersion.isEmpty) {
+        return null;
       }
-      
-      return null;
+
+      if (!updateData.containsKey('version_code')) {
+        updateData['version_code'] = 0;
+      }
+
+      print('解析到线上配置 version: $latestVersion, version_code: ${updateData['version_code']}');
+      return UpdateInfo.fromJson(updateData);
     } catch (e) {
       print('解析YAML响应失败: $e');
       return null;

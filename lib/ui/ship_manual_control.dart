@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:ui';
-import 'package:flutter/foundation.dart';
 import '../services/event_bus.dart'; // 导入事件总线
 import '../services/socket_service.dart'; // 导入Socket服务
 
@@ -16,8 +14,13 @@ import '../services/socket_service.dart'; // 导入Socket服务
 /// - 跃迁引擎：充能、执行跃迁、取消跃迁 (Enter键)
 /// 
 /// 包含飞船状态的视觉反馈动画，如引擎发光、转向倾斜、跃迁粒子效果等。
+///
+/// [keyboardActive] 为 false 时不处理键盘（例如底部切到别的 Tab 时仍挂载在 [IndexedStack] 中）。
 class ShipManualControl extends StatefulWidget {
-  const ShipManualControl({super.key});
+  const ShipManualControl({super.key, this.keyboardActive = true});
+
+  /// 当前页签是否需要响应物理键盘（WASD / 空格 / Enter）。
+  final bool keyboardActive;
 
   @override
   State<ShipManualControl> createState() => _ShipManualControlState();
@@ -25,9 +28,6 @@ class ShipManualControl extends StatefulWidget {
 
 class _ShipManualControlState extends State<ShipManualControl>
     with SingleTickerProviderStateMixin {
-  // 键盘焦点节点，用于接收键盘事件
-  final FocusNode _keyboardFocusNode = FocusNode();
-
   // 控制按钮按下状态
   bool _forwardPressed = false;
   bool _backwardPressed = false;
@@ -118,10 +118,21 @@ class _ShipManualControlState extends State<ShipManualControl>
       });
     });
 
-    // 请求焦点以接收键盘事件
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _keyboardFocusNode.requestFocus();
-    });
+    if (widget.keyboardActive) {
+      HardwareKeyboard.instance.addHandler(_onHardwareKeyEvent);
+    }
+  }
+
+  @override
+  void didUpdateWidget(ShipManualControl oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.keyboardActive != widget.keyboardActive) {
+      if (widget.keyboardActive) {
+        HardwareKeyboard.instance.addHandler(_onHardwareKeyEvent);
+      } else {
+        HardwareKeyboard.instance.removeHandler(_onHardwareKeyEvent);
+      }
+    }
   }
 
   @override
@@ -132,8 +143,33 @@ class _ShipManualControlState extends State<ShipManualControl>
     _jumpExecuteTimer?.cancel();
     _jumpPulseTimer?.cancel();
     _shipAnimController.dispose();
-    _keyboardFocusNode.dispose();
+    if (widget.keyboardActive) {
+      HardwareKeyboard.instance.removeHandler(_onHardwareKeyEvent);
+    }
     super.dispose();
+  }
+
+  /// 不依赖 [FocusNode]：避免被页面上方 [IconButton]、[PopupMenuButton] 等抢走焦点后收不到按键。
+  bool _onHardwareKeyEvent(KeyEvent event) {
+    if (!mounted || !widget.keyboardActive) return false;
+    // 弹窗/路由盖住本页时不抢按键（例如自动更新、权限对话框）
+    final route = ModalRoute.of(context);
+    if (route != null && !route.isCurrent) return false;
+
+    _handleKeyEvent(event);
+
+    switch (event.logicalKey) {
+      case LogicalKeyboardKey.keyW:
+      case LogicalKeyboardKey.keyA:
+      case LogicalKeyboardKey.keyS:
+      case LogicalKeyboardKey.keyD:
+      case LogicalKeyboardKey.space:
+      case LogicalKeyboardKey.enter:
+      case LogicalKeyboardKey.numpadEnter:
+        return true;
+      default:
+        return false;
+    }
   }
 
   // 处理键盘按键事件
@@ -501,11 +537,7 @@ class _ShipManualControlState extends State<ShipManualControl>
 
   @override
   Widget build(BuildContext context) {
-    return KeyboardListener(
-      focusNode: _keyboardFocusNode,
-      onKeyEvent: _handleKeyEvent,
-      autofocus: true,
-      child: Container(
+    return Container(
         padding: const EdgeInsets.all(16.0),
         decoration: BoxDecoration(
           color: Theme.of(
@@ -651,7 +683,6 @@ class _ShipManualControlState extends State<ShipManualControl>
             ),
           ],
         ),
-      ),
     );
   }
 

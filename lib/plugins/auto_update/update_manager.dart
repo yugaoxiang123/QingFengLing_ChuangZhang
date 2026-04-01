@@ -4,6 +4,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'update_service.dart';
 import 'update_info.dart';
 import 'permission_manager.dart';
+import 'update_manual_check.dart';
 
 /// 更新管理器组件
 class UpdateManager extends StatefulWidget {
@@ -32,7 +33,7 @@ class _UpdateManagerState extends State<UpdateManager> {
   bool _permissionChecked = false;
   Timer? _countdownTimer;  // 添加Timer引用用于管理
   int _forceUpdateCountdown = 10;  // 强制更新倒计时状态
-  Timer? _periodicCheckTimer;  // 添加定期检查更新的定时器
+  StreamSubscription<void>? _manualCheckSubscription;
 
   @override
   void initState() {
@@ -40,8 +41,15 @@ class _UpdateManagerState extends State<UpdateManager> {
     if (widget.enabled) {
       // 应用启动时先检查权限，再检查更新
       _initializeUpdateManager();
-      // 启动定期检查更新的定时器
-      _startPeriodicUpdateCheck();
+      _manualCheckSubscription = UpdateManualCheck.requests.listen((_) {
+        if (mounted) {
+          _checkUpdate(
+            showToast: true,
+            forceCheck: true,
+            userInitiated: true,
+          );
+        }
+      });
     }
   }
 
@@ -82,46 +90,83 @@ class _UpdateManagerState extends State<UpdateManager> {
 
 
   /// 检查更新
-  Future<void> _checkUpdate({bool showToast = true, bool forceCheck = false}) async {
-    if (_isChecking) return;
+  Future<void> _checkUpdate({
+    bool showToast = true,
+    bool forceCheck = false,
+    bool userInitiated = false,
+  }) async {
+    if (_isChecking) {
+      if (userInitiated && mounted) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          const SnackBar(content: Text('正在检查更新，请稍候再试')),
+        );
+      }
+      return;
+    }
 
     setState(() {
       _isChecking = true;
     });
 
     try {
-      final updateInfo = await UpdateService().checkUpdate(
+      final outcome = await UpdateService().performUpdateCheck(
         serverUrl: widget.serverUrl,
         updatePath: widget.updatePath,
         showToast: showToast,
         forceCheck: forceCheck,
       );
 
+      if (!mounted) return;
+
+      final updateInfo = outcome.info;
       if (updateInfo != null) {
         print('发现新版本: ${updateInfo.version} (${updateInfo.versionCode})');
+
+        if (userInitiated && updateInfo.updateType == UpdateType.silent) {
+          ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+            SnackBar(
+              content: Text('发现新版本 ${updateInfo.version}，正在后台下载…'),
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
 
         // 根据更新类型处理
         switch (updateInfo.updateType) {
           case UpdateType.silent:
-            // 静默更新，直接下载并安装
             _silentUpdate(updateInfo);
             break;
           case UpdateType.force:
-            // 强制更新，显示强制更新对话框
             _showForceUpdateDialog(updateInfo);
             break;
           case UpdateType.normal:
-            // 普通更新，显示普通更新对话框
             _showNormalUpdateDialog(updateInfo);
             break;
+        }
+      } else if (userInitiated && outcome.message.isNotEmpty) {
+        final msg = outcome.message;
+        if (!msg.contains('未到检查间隔') && !msg.contains('仅内部逻辑')) {
+          ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+            SnackBar(
+              content: Text(msg),
+              duration: const Duration(seconds: 6),
+            ),
+          );
         }
       }
     } catch (e) {
       print('检查更新失败: $e');
+      if (userInitiated && mounted) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          SnackBar(content: Text('检查更新异常：$e')),
+        );
+      }
     } finally {
-      setState(() {
-        _isChecking = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isChecking = false;
+        });
+      }
     }
   }
 
@@ -184,7 +229,7 @@ class _UpdateManagerState extends State<UpdateManager> {
         });
       }
     }
-      }
+  }
 
   /// 显示强制更新对话框
   void _showForceUpdateDialog(UpdateInfo updateInfo) {
@@ -416,34 +461,11 @@ class _UpdateManagerState extends State<UpdateManager> {
     }
   }
 
-  /// 启动定期检查更新
-  void _startPeriodicUpdateCheck() {
-    // 使用配置文件中的检查间隔
-    final checkInterval = Duration(seconds: UpdateConfig.checkIntervalSeconds);
-    
-          _periodicCheckTimer = Timer.periodic(checkInterval, (timer) {
-        if (mounted && !_isChecking && !_isDownloading && !_isInstalling) {
-          print('定期检查更新...');
-          // 强制检查更新，忽略时间间隔限制
-          _checkUpdate(showToast: false, forceCheck: true);
-        }
-      });
-    
-    print('已启动定期更新检查，间隔：${checkInterval.inSeconds}秒');
-  }
-
-  /// 停止定期检查更新
-  void _stopPeriodicUpdateCheck() {
-    _periodicCheckTimer?.cancel();
-    _periodicCheckTimer = null;
-    print('已停止定期更新检查');
-  }
-
   @override
   void dispose() {
     // 清理Timer
     _countdownTimer?.cancel();
-    _stopPeriodicUpdateCheck(); // 停止定期检查定时器
+    _manualCheckSubscription?.cancel();
     super.dispose();
   }
 

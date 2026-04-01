@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/socket_service.dart';
+import '../plugins/auto_update/update_manual_check.dart';
 
 /// Socket服务器状态页面
 /// 
@@ -169,10 +170,30 @@ class _SocketServerPageState extends State<SocketServerPage> {
                 ),
               ],
             ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _requestCheckForUpdate,
+                icon: const Icon(Icons.system_update_outlined),
+                label: const Text('检测新版本'),
+              ),
+            ),
           ],
         ),
       ),
     );
+  }
+
+  void _requestCheckForUpdate() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('正在检查更新…'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+    UpdateManualCheck.request();
   }
 
   // 客户端列表

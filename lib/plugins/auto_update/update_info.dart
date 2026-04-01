@@ -61,6 +61,20 @@ class UpdateInfo {
   }
 }
 
+/// [UpdateService.performUpdateCheck] 的完整结果，便于向用户展示原因。
+class UpdateCheckOutcome {
+  const UpdateCheckOutcome({
+    this.info,
+    required this.message,
+  });
+
+  final UpdateInfo? info;
+  /// 无新版本或失败时的说明；有新版本时可为空。
+  final String message;
+
+  bool get hasNewVersion => info != null;
+}
+
 /// 更新类型常量
 class UpdateType {
   static const int normal = 0;    // 普通更新（用户可选择）

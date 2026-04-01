@@ -77,7 +77,7 @@ class _HomePageState extends State<HomePage> {
                 // 顶部控制面板：显示时间、坐标、速度等信息
                 const ControlPanel(),
                 // 飞船手动控制面板：提供方向控制和跃迁功能
-                const ShipManualControl(),
+                ShipManualControl(keyboardActive: _selectedIndex == 0),
               ],
             ),
           ),
