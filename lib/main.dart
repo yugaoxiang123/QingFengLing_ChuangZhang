@@ -44,7 +44,7 @@ class _StageVideoPageState extends State<StageVideoPage> {
   // 阶段名称（含舷窗关闭）
   // 索引与控制面板阶段号映射见 _sendCurrentStage
   final List<String> stages = [
-    '舷窗关闭', // stageIndex = 0，对应控制面板阶段 1（与“登船准备”共享）
+    '舷窗关闭', // stageIndex = 0，视频 0.mp4；控制面板阶段 1（与“登船准备”共享）
     '雷电防护',
     '登船准备',
     '飞船起飞',
@@ -55,10 +55,14 @@ class _StageVideoPageState extends State<StageVideoPage> {
     '抵达月球',
   ];
 
+  /// 舷窗关闭：`0.mp4`；其它阶段播完主视频后的待机：`99.mp4`（见 data.json）
+  static const int _portholeClosedVideoIndex = 0;
+  static const int _stageIdleVideoIndex = 99;
+
   int currentStageIndex = 0;
   // 当前阶段进入时间（用于计算2分钟停留时长，仅非舷窗关闭阶段使用）
   DateTime? _stageEnterTime;
-  // 标记当前是否处于“阶段内待机视频”（舷窗关闭视频）播放状态
+  // 标记当前是否处于阶段内待机（99.mp4），与舷窗关闭的 0.mp4 不同
   bool _isStageStandbyPlaying = false;
   // 最新更新信息（用于右上角更新日志展示）
   UpdateInfo? _latestUpdateInfo;
@@ -213,8 +217,15 @@ class _StageVideoPageState extends State<StageVideoPage> {
         if (success) {
           debugPrint('${video.name} 下载完成');
           // 如果当前播放的视频刚下载完成，重新初始化
-          final currentVideoIndex = currentStageIndex == 0 ? 0 : currentStageIndex;
-          if (currentVideoIndex == video.index) {
+          final int expectedVideoIndex;
+          if (currentStageIndex == 0) {
+            expectedVideoIndex = _portholeClosedVideoIndex;
+          } else if (_isStageStandbyPlaying) {
+            expectedVideoIndex = _stageIdleVideoIndex;
+          } else {
+            expectedVideoIndex = currentStageIndex;
+          }
+          if (expectedVideoIndex == video.index) {
             _initializeVideo(currentStageIndex);
           }
         } else {
@@ -272,15 +283,13 @@ class _StageVideoPageState extends State<StageVideoPage> {
     
     try {
       // 阶段索引 -> 实际播放的视频索引
-      //  - 阶段 0（舷窗关闭）：始终播放 index = 0 的待机视频
-      //  - 其他阶段：
-      //      * 主阶段播放：播放各自的 index（1~8）
-      //      * 阶段内待机：播放 index = 0 的待机视频
+      //  - 阶段 0（舷窗关闭）：0.mp4
+      //  - 其他阶段：主视频 = stageIndex；待机 = 99.mp4
       final int videoIndex;
       if (stageIndex == 0) {
-        videoIndex = 0;
+        videoIndex = _portholeClosedVideoIndex;
       } else if (_isStageStandbyPlaying) {
-        videoIndex = 0;
+        videoIndex = _stageIdleVideoIndex;
       } else {
         videoIndex = stageIndex;
       }
@@ -388,14 +397,14 @@ class _StageVideoPageState extends State<StageVideoPage> {
               ? DateTime.now().difference(_stageEnterTime!)
               : Duration.zero;
 
-          // 1）主阶段视频：播完后切换到阶段内待机视频（舷窗关闭视频，循环）
+          // 1）主阶段视频：播完后切换到阶段内待机视频（99.mp4，循环）
           if (!_isStageStandbyPlaying) {
             final isVideoFinished =
                 position >= duration - const Duration(milliseconds: 200);
             if (isVideoFinished) {
               // 切换到阶段内待机视频，但保持当前阶段索引不变
               _isStageStandbyPlaying = true;
-              // 重新初始化视频，播放舷窗关闭视频（index = 0）
+              // 重新初始化视频，播放阶段待机（99.mp4）
               _initializeVideo(currentStageIndex);
               return;
             }

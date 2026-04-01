@@ -2,18 +2,28 @@
   "description": "更新每个视频的url即可，客户端会读取url进行下载，注意对应关系",
   "videos": [
     {
+      "index": 0,
+      "name": "舷窗关闭",
+      "url": "https://shv-medias.oss-cn-zhangjiakou.aliyuncs.com/QFL/chuanzhang/0.mp4"
+    },
+    {
+      "index": 99,
+      "name": "阶段待机",
+      "url": "https://shv-medias.oss-cn-zhangjiakou.aliyuncs.com/QFL/chuanzhang/99.mp4"
+    },
+    {
       "index": 1,
-      "name": "登船准备",
+      "name": "雷电防护",
       "url": "https://shv-medias.oss-cn-zhangjiakou.aliyuncs.com/QFL/chuanzhang/1.mp4"
     },
     {
       "index": 2,
-      "name": "飞船起飞",
+      "name": "登船准备",
       "url": "https://shv-medias.oss-cn-zhangjiakou.aliyuncs.com/QFL/chuanzhang/2.mp4"
     },
     {
       "index": 3,
-      "name": "雷电防护",
+      "name": "飞船起飞",
       "url": "https://shv-medias.oss-cn-zhangjiakou.aliyuncs.com/QFL/chuanzhang/3.mp4"
     },
     {
