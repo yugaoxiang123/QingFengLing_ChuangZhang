@@ -3,9 +3,9 @@
 
 # 最新版本信息
 latest_version:
-  version: "0.1.19"
-  version_code: 119
-  build_date: "2026-03-27"
+  version: "0.1.22"
+  version_code: 122
+  build_date: "2026-04-01"
   
   # 更新类型
   # 0: 普通更新（用户可选择）
@@ -19,10 +19,10 @@ latest_version:
     - 向控制面板发送剧情更改消息
     
   # 下载链接
-  download_url: "https://shv-software.oss-cn-zhangjiakou.aliyuncs.com/Android-Packages/qfl-chuanzhang/a12bd874ce75d98a67568203f4f4469d.apk"
+  download_url: "https://shv-software.oss-cn-zhangjiakou.aliyuncs.com/Android-Packages/qfl-chuanzhang/4d6aaafebd3fc13775514a3e3bd38156.apk"
   
   # 文件信息
   file_info:
-    size: 52039074  # 文件大小（字节）
-    md5: "a12bd874ce75d98a67568203f4f4469d"  # MD5校验值
-    sha256: "9f825702e38e6adc783760f9d23ce128bafa7063e3ef7802af06f8d01dc475d0"  # SHA256校验值
+    size: 52038430  # 文件大小（字节）
+    md5: "4d6aaafebd3fc13775514a3e3bd38156"  # MD5校验值
+    sha256: "955cd5e9bb09d1ba45e1be6c68e573574dd39f70d1198d375b62cd02c28bff03"  # SHA256校验值
